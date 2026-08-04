@@ -25,18 +25,14 @@ import {
   Bell,
   FileText,
   Settings,
-  MessageSquare,
   FileBarChart2,
   SlidersHorizontal,
   FlaskConical,
   HelpCircle,
   KanbanSquare,
   Sparkles,
-  MessageCircle,
-  ShoppingBag,
-  Newspaper,
-  Eye,
   Handshake,
+  Package,
 } from 'lucide-react'
 
 export const NAV_GROUPS: NavGroup[] = [
@@ -59,28 +55,24 @@ export const NAV_GROUPS: NavGroup[] = [
         roles: ['owner', 'rop', 'mp', 'lmai'],
       },
       {
+        // Заказы из Telegram-бота. Бухгалтеру не нужны — он работает
+        // с итогами в «Финансах», а не с отгрузками.
+        href: '/dashboard/orders',
+        label: 'Заказы',
+        icon: Package,
+        roles: ['owner', 'rop', 'mp', 'lmai'],
+      },
+      {
         href: '/dashboard/copilot',
         label: 'ИИ-помощник',
         icon: Sparkles,
         roles: ['owner', 'rop', 'mp', 'lmai', 'accountant'],
-      },
-      {
-        href: '/dashboard/consultation-chat',
-        label: 'Чат консультации',
-        icon: MessageCircle,
-        roles: ['owner', 'rop', 'mp', 'lmai'],
       },
     ],
   },
   {
     label: 'AI Бот',
     items: [
-      {
-        href: '/dashboard/dialogs',
-        label: 'Диалоги',
-        icon: MessageSquare,
-        roles: ['owner', 'rop', 'mp', 'lmai'],
-      },
       {
         href: '/dashboard/bot-analytics',
         label: 'Аналитика бота',
@@ -104,31 +96,6 @@ export const NAV_GROUPS: NavGroup[] = [
         label: 'Лаборатория',
         icon: FlaskConical,
         roles: ['owner'],
-      },
-    ],
-  },
-  {
-    // Витрина Smilekit: товары, новости и аналитика магазина. Данные живут в
-    // отдельном сервисе (Express + SQLite), CRM работает с ним через его админ-API.
-    label: 'Интернет магазин',
-    items: [
-      {
-        href: '/dashboard/products',
-        label: 'Товары',
-        icon: ShoppingBag,
-        roles: ['owner', 'rop'],
-      },
-      {
-        href: '/dashboard/posts',
-        label: 'Посты',
-        icon: Newspaper,
-        roles: ['owner', 'rop'],
-      },
-      {
-        href: '/dashboard/shop-analytics',
-        label: 'Аналитика магазина',
-        icon: Eye,
-        roles: ['owner', 'rop'],
       },
     ],
   },

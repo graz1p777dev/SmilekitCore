@@ -1,14 +1,12 @@
 'use client'
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Search, LayoutDashboard, BarChart3, DollarSign, TrendingUp, Users, Settings, ShoppingBag, Newspaper, Eye, Handshake } from 'lucide-react'
+import { Search, LayoutDashboard, BarChart3, DollarSign, TrendingUp, Users, Settings, Handshake, Package } from 'lucide-react'
 
 const commands = [
   { label: 'Дашборд', href: '/dashboard', icon: LayoutDashboard, category: 'Навигация' },
   { label: 'Сделки', href: '/dashboard/deals', icon: Handshake, category: 'Навигация' },
-  { label: 'Товары витрины', href: '/dashboard/products', icon: ShoppingBag, category: 'Интернет магазин' },
-  { label: 'Посты витрины', href: '/dashboard/posts', icon: Newspaper, category: 'Интернет магазин' },
-  { label: 'Аналитика магазина', href: '/dashboard/shop-analytics', icon: Eye, category: 'Интернет магазин' },
+  { label: 'Заказы', href: '/dashboard/orders', icon: Package, category: 'Навигация' },
   { label: 'Декомпозиция / KPI', href: '/dashboard/decomposition', icon: BarChart3, category: 'Навигация' },
   { label: 'Зарплата', href: '/dashboard/salary', icon: DollarSign, category: 'Навигация' },
   { label: 'Финансы', href: '/dashboard/finance', icon: TrendingUp, category: 'Навигация' },

@@ -1,14 +1,15 @@
 // ─── POST /api/internal/deals ───────────────────────────────────────────────
-// Витрина Smilekit (Express + SQLite) зовёт этот эндпоинт, когда клиент
-// впервые написал боту: в CRM появляется сделка в «Неразобранном».
-// Защита — тот же общий секрет, что у /api/internal/notify: у витрины нет и
-// не должно быть SUPABASE_SERVICE_ROLE_KEY.
+// Telegram-бот Smilekit (bot/smilekit_bot/crm.py, push_deal) зовёт этот
+// эндпоинт при первом сообщении клиента: в CRM появляется сделка в
+// «Неразобранном». Защита — тот же общий секрет, что у /api/internal/notify
+// и /api/internal/orders: у бота нет и не должно быть SUPABASE_SERVICE_ROLE_KEY.
 //
-// Вызов у витрины fire-and-forget: если CRM недоступна, бот всё равно
-// ответит клиенту, а сделка подтянется кнопкой «Синхронизировать».
+// Вызов у бота fire-and-forget: если CRM недоступна, клиент всё равно
+// получит ответ, а сделка подтянется кнопкой «Синхронизировать».
 
 import { NextResponse } from 'next/server'
 import { upsertDealFromInbound } from '@/lib/deals/auto-create'
+import { advanceDealFromBotAction } from '@/lib/deals/advance-stage'
 import type { DealSource } from '@/types'
 
 export const dynamic = 'force-dynamic'
@@ -61,4 +62,48 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({ ok: true, created: result.created, id: result.id })
+}
+
+// ─── PATCH /api/internal/deals ──────────────────────────────────────────────
+// Бот на каждое сообщение клиента шлёт сюда распознанное намерение (action) —
+// сделка двигается по этапам воронки без участия менеджера.
+// См. src/lib/deals/advance-stage.ts.
+
+export async function PATCH(request: Request) {
+  const expectedToken = process.env.INTERNAL_NOTIFY_TOKEN
+  if (!expectedToken) {
+    return NextResponse.json({ error: 'Not configured' }, { status: 503 })
+  }
+  if (request.headers.get('x-internal-token') !== expectedToken) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  let payload: { externalKey?: string; action?: string }
+  try {
+    payload = await request.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+  }
+
+  if (!payload.externalKey || !payload.externalKey.trim()) {
+    return NextResponse.json({ error: 'externalKey is required' }, { status: 400 })
+  }
+  if (!payload.action) {
+    return NextResponse.json({ error: 'action is required' }, { status: 400 })
+  }
+
+  const result = await advanceDealFromBotAction(payload.externalKey, payload.action)
+
+  if (!result.ok) {
+    if (result.skipped === 'not_found') {
+      return NextResponse.json({ error: 'Deal not found' }, { status: 404 })
+    }
+    if (result.skipped === 'unknown_action') {
+      return NextResponse.json({ error: `Unknown action: ${payload.action}` }, { status: 400 })
+    }
+    console.error('internal/deals advance failed', result.error)
+    return NextResponse.json({ error: result.error || 'Advance failed' }, { status: 500 })
+  }
+
+  return NextResponse.json({ ok: true, id: result.id ?? null, skipped: result.skipped ?? null })
 }
