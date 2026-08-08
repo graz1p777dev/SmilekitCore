@@ -1,17 +1,17 @@
-import { getShopBotSettings } from '@/actions/shop-bot-settings'
-import { ShopBotSettingsClient } from '@/components/shop/ShopBotSettingsClient'
-import { ShopApiError } from '@/components/shop/ShopApiError'
+import { getBotSettings } from '@/actions/smilekit-bot-settings'
+import { SmilekitBotSettingsClient } from '@/components/bot/SmilekitBotSettingsClient'
+import { SmilekitBotApiError } from '@/components/bot/SmilekitBotApiError'
 
-// Бот магазина — часть витрины (Express + SQLite), а не отдельный бэкенд:
-// настройки читаются и пишутся через её админ-API на сервере, чтобы
-// SHOP_ADMIN_TOKEN не попал в браузер.
+// Бот — отдельный сервис (aiogram, Railway smilekit-bot), не часть CRM:
+// настройки читаются и пишутся через его внутренний API на сервере, чтобы
+// SMILEKIT_BOT_INTERNAL_TOKEN не попал в браузер.
 export const dynamic = 'force-dynamic'
 
 export const metadata = { title: 'Настройки бота — Smilekit' }
 
 export default async function BotSettingsPage() {
-  const result = await getShopBotSettings()
-  if (!result.ok) return <ShopApiError error={result.error} />
+  const result = await getBotSettings()
+  if (!result.ok) return <SmilekitBotApiError error={result.error} />
 
-  return <ShopBotSettingsClient settings={result.data} />
+  return <SmilekitBotSettingsClient settings={result.data} />
 }
