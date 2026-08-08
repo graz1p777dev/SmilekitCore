@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { KpiSettingsPanel } from '@/components/dashboard/KpiSettingsPanel'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Plus, Save, Pencil, Trash2, Settings, Building2, ShieldCheck, CalendarDays, Clock3, Palette, Check } from 'lucide-react'
+import { Plus, Save, Pencil, Trash2, Settings, Building2, ShieldCheck, CalendarDays, Clock3, Palette, Check, Workflow } from 'lucide-react'
 import { toast } from 'sonner'
 import { getAuditLog } from '@/actions/audit'
 import { auditSectionLabel, type AuditRow } from '@/lib/audit-format'
@@ -13,7 +13,8 @@ import {
   getDepartments, createDepartment, updateDepartment, deleteDepartment,
   getRoles, createRole, updateRole, deleteRole,
   getWorkSchedules, createWorkSchedule, updateWorkSchedule, deleteWorkSchedule,
-  type DeptRow, type RoleRow, type WorkScheduleRow,
+  getDealStages, createDealStage, updateDealStage, deleteDealStage,
+  type DeptRow, type RoleRow, type WorkScheduleRow, type DealStageRow,
 } from '@/actions/settings'
 import { ACCENT_PRESETS, ACCENT_COOKIE_NAME, DEFAULT_ACCENT, isAccentId, type AccentId } from '@/lib/accent-theme'
 
@@ -693,6 +694,183 @@ function WorkSchedulesPanel() {
   )
 }
 
+// ─── Панель этапов воронки сделок ───────────────────────────────────────────────
+
+function DealStagesPanel() {
+  const [stages, setStages]          = useState<DealStageRow[]>([])
+  const [loading, setLoading]        = useState(true)
+  const [reloadKey, setReloadKey]    = useState(0)
+  const [editingId, setEditingId]    = useState<string | null>(null)
+  const [editForm, setEditForm]      = useState({ name: '', description: '', color: '#94a3b8' })
+  const [addingNew, setAddingNew]    = useState(false)
+  const [newForm, setNewForm]        = useState({ name: '', description: '', color: '#94a3b8' })
+  const [isPending, startTransition] = useTransition()
+
+  useEffect(() => {
+    getDealStages().then(s => { setStages(s); setLoading(false) })
+  }, [reloadKey])
+
+  const reload = () => setReloadKey(k => k + 1)
+
+  const handleStartEdit = (s: DealStageRow) => {
+    setEditingId(s.id)
+    setEditForm({ name: s.name, description: s.description ?? '', color: s.color })
+  }
+
+  const handleSaveEdit = (s: DealStageRow) => {
+    startTransition(async () => {
+      const r = await updateDealStage(s.id, editForm.name, editForm.description, editForm.color)
+      if (r.success) {
+        toast.success('Этап обновлён')
+        setEditingId(null)
+        reload()
+      } else toast.error(r.error)
+    })
+  }
+
+  const handleCreate = () => {
+    if (!newForm.name.trim()) { toast.error('Введите название'); return }
+    startTransition(async () => {
+      const r = await createDealStage(newForm.name, newForm.description, newForm.color)
+      if (r.success) {
+        toast.success('Этап добавлен')
+        setAddingNew(false)
+        setNewForm({ name: '', description: '', color: '#94a3b8' })
+        reload()
+      } else toast.error(r.error)
+    })
+  }
+
+  const handleDelete = (s: DealStageRow) => {
+    if (!confirm(`Удалить этап «${s.name}»? Действие необратимо.`)) return
+    startTransition(async () => {
+      const r = await deleteDealStage(s.id)
+      if (r.success) {
+        toast.success('Этап удалён')
+        reload()
+      } else toast.error(r.error)
+    })
+  }
+
+  return (
+    <SectionCard icon={<Workflow size={15} color="#ffffff" />} title="Этапы воронки">
+      <p className="text-xs text-muted-foreground mb-4">
+        Порядок и цвет управляют доской сделок. Бот двигает сделки по этим этапам автоматически.
+      </p>
+      {addingNew ? (
+        <div className="mb-4 p-3 rounded-xl space-y-2" style={{ backgroundColor: '#fdfbfb', border: '1px solid #ebebee' }}>
+          <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#7d7174' }}>Новый этап</p>
+          <div className="space-y-1">
+            <Label className="text-xs font-semibold text-gray-500">Название *</Label>
+            <Input value={newForm.name} onChange={e => setNewForm(f => ({ ...f, name: e.target.value }))}
+              placeholder="Например: Ждёт согласования" className="h-8 rounded-lg text-sm border-gray-200" autoFocus />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs font-semibold text-gray-500">Описание</Label>
+            <Input value={newForm.description} onChange={e => setNewForm(f => ({ ...f, description: e.target.value }))}
+              placeholder="Когда сделка сюда попадает..." className="h-8 rounded-lg text-sm border-gray-200" />
+          </div>
+          <div className="flex items-center gap-2">
+            <Label className="text-xs font-semibold text-gray-500">Цвет</Label>
+            <input type="color" value={newForm.color} onChange={e => setNewForm(f => ({ ...f, color: e.target.value }))}
+              className="h-7 w-10 rounded-md border border-gray-200 cursor-pointer" />
+          </div>
+          <div className="flex gap-2 pt-1">
+            <Button size="sm" className="h-7 rounded-lg text-xs text-white" style={{ backgroundColor: '#5115a4' }}
+              onClick={handleCreate} disabled={isPending}>
+              <Save size={12} className="mr-1" /> Сохранить
+            </Button>
+            <Button variant="ghost" size="sm" className="h-7 rounded-lg text-xs"
+              onClick={() => setAddingNew(false)} disabled={isPending}>Отмена</Button>
+          </div>
+        </div>
+      ) : (
+        <Button variant="outline" size="sm" className="mb-4 h-8 rounded-xl gap-1.5 text-xs"
+          style={{ borderColor: '#5115a4', color: '#5115a4' }} onClick={() => setAddingNew(true)}>
+          <Plus size={13} /> Добавить этап
+        </Button>
+      )}
+
+      {loading ? (
+        <div className="space-y-2">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="h-12 rounded-xl animate-pulse" style={{ backgroundColor: '#fdfbfb' }} />
+          ))}
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {stages.map(s => (
+            <div key={s.id} className="rounded-xl px-3 py-2.5"
+              style={{ backgroundColor: '#fdfbfb', border: '1px solid #ebebee' }}>
+              {editingId === s.id ? (
+                <div className="space-y-2">
+                  <div className="space-y-1">
+                    <Label className="text-[10px] font-semibold text-gray-400 uppercase">Название *</Label>
+                    <Input value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
+                      className="h-7 rounded-lg text-sm border-gray-200" autoFocus />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[10px] font-semibold text-gray-400 uppercase">Описание</Label>
+                    <Input value={editForm.description} onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))}
+                      placeholder="Описание этапа..." className="h-7 rounded-lg text-sm border-gray-200" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Label className="text-[10px] font-semibold text-gray-400 uppercase">Цвет</Label>
+                    <input type="color" value={editForm.color} onChange={e => setEditForm(f => ({ ...f, color: e.target.value }))}
+                      className="h-6 w-9 rounded-md border border-gray-200 cursor-pointer" />
+                  </div>
+                  <div className="flex gap-1.5 pt-0.5">
+                    <Button size="sm" className="h-6 rounded-lg text-xs text-white px-2"
+                      style={{ backgroundColor: '#5115a4' }} onClick={() => handleSaveEdit(s)} disabled={isPending}>
+                      <Save size={11} className="mr-1" /> Сохранить
+                    </Button>
+                    <Button variant="ghost" size="sm" className="h-6 rounded-lg text-xs px-2"
+                      onClick={() => setEditingId(null)} disabled={isPending}>Отмена</Button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                      <span className="shrink-0 h-2.5 w-2.5 rounded-full" style={{ backgroundColor: s.color }} />
+                      <span className="text-sm font-medium truncate" style={{ color: '#1b1517' }}>{s.name}</span>
+                      {s.is_default && (
+                        <span className="text-[10px]" style={{ color: '#7d7174' }}>по умолчанию</span>
+                      )}
+                      {s.kind !== 'normal' && (
+                        <span className="text-[10px]" style={{ color: '#7d7174' }}>
+                          {s.kind === 'won' ? 'выигрыш' : 'потеря'}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button onClick={() => handleStartEdit(s)}
+                        className="p-1 rounded-lg hover:bg-gray-200 transition-colors" disabled={isPending}>
+                        <Pencil size={13} style={{ color: '#7d7174' }} />
+                      </button>
+                      {!s.is_default && (
+                        <button onClick={() => handleDelete(s)}
+                          className="p-1 rounded-lg hover:bg-red-100 transition-colors" title="Удалить" disabled={isPending}>
+                          <Trash2 size={13} style={{ color: '#fca5a5' }} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  {s.description ? (
+                    <p className="mt-1 text-[11px]" style={{ color: '#7d7174' }}>{s.description}</p>
+                  ) : (
+                    <p className="mt-1 text-[11px] italic" style={{ color: '#ddd3d3' }}>Описание не задано</p>
+                  )}
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </SectionCard>
+  )
+}
+
 // ─── Главная страница ─────────────────────────────────────────────────────────
 
 export default function SettingsPage() {
@@ -718,6 +896,7 @@ export default function SettingsPage() {
           <DepartmentsPanel />
           <WorkSchedulesPanel />
           <RolesPanel />
+          <DealStagesPanel />
         </div>
       </div>
     </div>

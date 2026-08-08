@@ -31,6 +31,16 @@ export interface WorkScheduleRow {
   is_active: boolean
 }
 
+export interface DealStageRow {
+  id: string
+  name: string
+  description: string | null
+  color: string
+  sort_order: number
+  kind: 'normal' | 'won' | 'lost'
+  is_default: boolean
+}
+
 // ─── Auth guard ────────────────────────────────────────────────────────────────
 
 async function requireSession() {
@@ -261,5 +271,85 @@ export async function deleteWorkSchedule(id: string): Promise<ActionResult> {
   await recordAudit({ action: 'delete', resourceType: 'work_schedule', resourceId: id, summary: `Удалён график «${ws?.name ?? ''}»` })
   revalidatePath('/dashboard/settings')
   revalidatePath('/dashboard/employees')
+  return { success: true }
+}
+
+// ─── Этапы воронки сделок ────────────────────────────────────────────────────
+
+export async function getDealStages(): Promise<DealStageRow[]> {
+  const session = await requireSession()
+  if (!session) return []
+  const supabase = await createClient()
+  const { data } = await supabase
+    .from('deal_stages')
+    .select('id, name, description, color, sort_order, kind, is_default')
+    .order('sort_order')
+  return (data ?? []) as DealStageRow[]
+}
+
+/** Новые этапы всегда 'normal' — 'won'/'lost' зарезервированы под два
+ * уже заведённых терминальных этапа, отчётность считает конверсию по ним. */
+export async function createDealStage(name: string, description: string, color: string): Promise<ActionResult> {
+  if (!name.trim()) return { success: false, error: 'Название обязательно' }
+  const session = await requireSession()
+  if (!session) return { success: false, error: 'Нет доступа' }
+  const admin = createAdminClient()
+  const { data: last } = await admin.from('deal_stages')
+    .select('sort_order').order('sort_order', { ascending: false }).limit(1).maybeSingle()
+  const nextOrder = ((last as { sort_order: number } | null)?.sort_order ?? 0) + 1
+  const { data: created, error } = await admin.from('deal_stages').insert({
+    name: name.trim(),
+    description: description.trim() || null,
+    color: color.trim() || '#94a3b8',
+    sort_order: nextOrder,
+    kind: 'normal',
+    is_default: false,
+  }).select('id').maybeSingle()
+  if (error) return { success: false, error: error.message }
+  await recordAudit({ action: 'create', resourceType: 'deal_stage', resourceId: created?.id, summary: `Создан этап воронки «${name.trim()}»` })
+  revalidatePath('/dashboard/settings')
+  revalidatePath('/dashboard/deals')
+  return { success: true }
+}
+
+export async function updateDealStage(id: string, name: string, description: string, color: string): Promise<ActionResult> {
+  if (!name.trim()) return { success: false, error: 'Название обязательно' }
+  const session = await requireSession()
+  if (!session) return { success: false, error: 'Нет доступа' }
+  const admin = createAdminClient()
+  const { error } = await admin.from('deal_stages').update({
+    name: name.trim(),
+    description: description.trim() || null,
+    color: color.trim() || '#94a3b8',
+    updated_at: new Date().toISOString(),
+  }).eq('id', id)
+  if (error) return { success: false, error: error.message }
+  await recordAudit({ action: 'update', resourceType: 'deal_stage', resourceId: id, summary: `Изменён этап воронки «${name.trim()}»` })
+  revalidatePath('/dashboard/settings')
+  revalidatePath('/dashboard/deals')
+  return { success: true }
+}
+
+export async function deleteDealStage(id: string): Promise<ActionResult> {
+  const session = await requireSession()
+  if (!session) return { success: false, error: 'Нет доступа' }
+  const admin = createAdminClient()
+  const { data: stage } = await admin.from('deal_stages').select('name, is_default').eq('id', id).maybeSingle()
+  if (!stage) return { success: false, error: 'Этап не найден' }
+  if ((stage as { is_default: boolean }).is_default) {
+    return { success: false, error: 'Этап по умолчанию нельзя удалить — в него попадают новые сделки' }
+  }
+  const { count } = await admin.from('deals')
+    .select('id', { count: 'exact', head: true })
+    .eq('stage_id', id)
+    .is('deleted_at', null)
+  if (count && count > 0) {
+    return { success: false, error: `Нельзя удалить: на этом этапе ${count} сделок(и) — сначала перенесите их на другой этап` }
+  }
+  const { error } = await admin.from('deal_stages').delete().eq('id', id)
+  if (error) return { success: false, error: error.message }
+  await recordAudit({ action: 'delete', resourceType: 'deal_stage', resourceId: id, summary: `Удалён этап воронки «${(stage as { name: string }).name}»` })
+  revalidatePath('/dashboard/settings')
+  revalidatePath('/dashboard/deals')
   return { success: true }
 }

@@ -18,6 +18,7 @@ const SECTION_RU: Record<string, string> = {
   work_schedule: 'Графики',
   employee: 'Сотрудники',
   employee_kpi: 'KPI-планы',
+  deal_stage: 'Этапы воронки',
 }
 
 export function auditSectionLabel(resourceType: string): string {

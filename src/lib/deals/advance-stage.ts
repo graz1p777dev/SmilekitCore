@@ -12,14 +12,21 @@
 
 import { createAdminClient } from '@/lib/supabase/admin'
 
-/** action → название этапа (supabase/migrations/036_deals.sql). */
+/** action → название этапа (supabase/migrations/036_deals.sql, 039_...sql). */
 const ACTION_STAGE_NAME: Record<string, string> = {
   primary_contact: 'Заявка получена',
   need_identified: 'Потребность выявлена',
   interest_confirmed: 'Интерес подтверждён',
   ready_to_buy: 'Готов к покупке',
   order: 'Передан менеджеру',
+  non_standard_request: 'Нестандартный запрос',
 }
+
+// non_standard_request — не шаг воронки «к покупке», а сигнал разобраться
+// человеку (жалоба/возврат/сотрудничество): сделка может быть на любом этапе,
+// когда это случится, поэтому только для этого action правило «только вперёд»
+// не применяется.
+const BYPASS_FORWARD_ONLY = new Set(['non_standard_request'])
 
 export interface AdvanceDealResult {
   ok: boolean
@@ -71,7 +78,12 @@ export async function advanceDealFromBotAction(
 
   // Воронка двигается только вперёд — повторное распознанное намерение
   // (например клиент второй раз спросил про товар) не откатывает сделку.
-  if (currentStage && target.sort_order <= (currentStage as { sort_order: number }).sort_order) {
+  // Исключение — non_standard_request (см. BYPASS_FORWARD_ONLY выше).
+  if (
+    !BYPASS_FORWARD_ONLY.has(action) &&
+    currentStage &&
+    target.sort_order <= (currentStage as { sort_order: number }).sort_order
+  ) {
     return { ok: true, id: d.id, skipped: 'no_change' }
   }
 

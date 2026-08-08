@@ -62,7 +62,7 @@ export async function getDealsData(): Promise<DealsData> {
   const [{ data: stages }, { data: deals }, { data: emps }] = await Promise.all([
     supabase
       .from('deal_stages')
-      .select('id, name, sort_order, kind, color, is_default')
+      .select('id, name, sort_order, kind, color, is_default, description')
       .order('sort_order'),
     supabase
       .from('deals')

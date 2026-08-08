@@ -534,6 +534,7 @@ export interface DealStage {
   kind: DealStageKind
   color: string
   is_default: boolean
+  description: string | null
 }
 
 export interface Deal {
@@ -585,4 +586,44 @@ export interface DealViewer {
   id: string
   role: UserRole
   name: string
+}
+
+// ============================================
+// ЗАКАЗЫ — supabase/migrations/038_orders.sql
+// ============================================
+
+export type OrderStatus = 'new' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled'
+export type OrderSource = 'telegram_bot' | 'manual'
+export type OrderCurrency = 'KGS' | 'USD' | 'RUB'
+
+export interface Order {
+  id: string
+  customer_name: string | null
+  customer_phone: string | null
+  customer_username: string | null
+  telegram_chat_id: number | null
+  /** Количество коробок; null — клиент его не назвал. */
+  quantity: number | null
+  unit_price: number | null
+  total_amount: number | null
+  currency: OrderCurrency
+  city: string | null
+  status: OrderStatus
+  source: OrderSource
+  /** Текст заказа словами от бота. */
+  summary: string | null
+  /** Заметка менеджера — бот её не трогает. */
+  note: string | null
+  external_key: string | null
+  deal_id: string | null
+  responsible_employee_id: string | null
+  created_at: string
+  updated_at: string
+}
+
+/** Сделка, к которой привязан заказ, — короткой строкой для карточки. */
+export interface OrderDealRef {
+  id: string
+  title: string
+  stage_name: string | null
 }
