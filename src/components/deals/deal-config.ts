@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
-import { Send, MessageCircle, Camera, PenLine, Globe } from 'lucide-react'
+import { Send, MessageCircle, Camera, PenLine, Globe, Users } from 'lucide-react'
 import type { DealCurrency, DealSource } from '@/types'
 
 // ─── Каналы, из которых приходят сделки ──────────────────────────────────────
@@ -20,6 +20,7 @@ export const DEAL_SOURCE: Record<DealSource, DealSourceMeta> = {
   instagram: { label: 'Instagram', icon: Camera,        color: '#be185d', bg: '#fce7f3' },
   site:      { label: 'Сайт',      icon: Globe,         color: '#0e7490', bg: '#cffafe' },
   manual:    { label: 'Вручную',   icon: PenLine,       color: '#574d4f', bg: '#f0eaea' },
+  amocrm:    { label: 'amoCRM',    icon: Users,         color: '#b45309', bg: '#fef3c7' },
 }
 
 export const DEAL_CURRENCIES: DealCurrency[] = ['KGS', 'USD', 'RUB']

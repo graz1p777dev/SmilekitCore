@@ -29,6 +29,7 @@ const SOURCE_FALLBACK: Record<DealSource, string> = {
   instagram: 'Клиент из Instagram',
   site: 'Клиент с сайта',
   manual: 'Клиент',
+  amocrm: 'Клиент из amoCRM',
 }
 
 /** Заголовок сделки: имя → username → телефон → канал. Пустым не бывает. */

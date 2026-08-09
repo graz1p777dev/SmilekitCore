@@ -523,7 +523,7 @@ export interface TaskViewer {
 // ============================================
 
 export type DealStageKind = 'normal' | 'won' | 'lost'
-export type DealSource = 'telegram' | 'whatsapp' | 'instagram' | 'manual' | 'site'
+export type DealSource = 'telegram' | 'whatsapp' | 'instagram' | 'manual' | 'site' | 'amocrm'
 export type DealStatus = 'open' | 'won' | 'lost'
 export type DealCurrency = 'KGS' | 'USD' | 'RUB'
 
