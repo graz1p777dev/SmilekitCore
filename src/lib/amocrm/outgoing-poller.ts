@@ -8,6 +8,7 @@
 // чат менеджерским, и бот его больше не трогает.
 
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getAmoChatHistory } from '@/lib/amocrm/chat'
 
 const POLL_INTERVAL_MS = 60_000
 // Исходящее рядом с нашей же отправкой (бот шлёт через amojo и тоже создаёт
@@ -64,6 +65,7 @@ async function pollOnce(): Promise<void> {
   if (!events.length) return
 
   let maxAt = since
+  const historyByChat = new Map<string, ReturnType<typeof getAmoChatHistory>>()
   for (const event of events) {
     maxAt = Math.max(maxAt, event.created_at)
     const leadId = String(event.entity_id)
@@ -93,6 +95,19 @@ async function pollOnce(): Promise<void> {
       .limit(1)
     if (botNearby?.length) continue
 
+    let text = '[ответ менеджера]'
+    try {
+      let historyPromise = historyByChat.get(chat.chat_id)
+      if (!historyPromise) {
+        historyPromise = getAmoChatHistory(chat.chat_id, 200)
+        historyByChat.set(chat.chat_id, historyPromise)
+      }
+      const remoteMessage = (await historyPromise).find((item) => item.amoMessageId === messageId)
+      if (remoteMessage?.text) text = remoteMessage.text
+    } catch (error) {
+      console.error('amocrm outgoing poller: message text lookup failed', error)
+    }
+
     await supabase.from('amocrm_messages').upsert(
       {
         amo_message_id: messageId,
@@ -101,9 +116,9 @@ async function pollOnce(): Promise<void> {
         contact_id: chat.contact_id,
         direction: 'out',
         sender: 'operator',
-        // Текст исходящих Events API не отдаёт — важен сам факт для
-        // истории и для правила «менеджер в чате — бот молчит».
-        text: '[ответ менеджера]',
+        // Events API не отдаёт текст, поэтому добираем его из живой истории
+        // amojo. Заглушка остаётся только аварийным вариантом при сбое amojo.
+        text,
         created_at: eventTime.toISOString(),
       },
       { onConflict: 'amo_message_id', ignoreDuplicates: true }

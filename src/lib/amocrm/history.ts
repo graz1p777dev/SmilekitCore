@@ -2,6 +2,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { getAmoChatHistory } from '@/lib/amocrm/chat'
 
 const BOT_ECHO_WINDOW_MS = 15 * 60_000
+const MANAGER_REPLY_PLACEHOLDER = '[ответ менеджера]'
 
 /**
  * Подтягивает живую историю amojo в нашу таблицу. Это делает видимыми
@@ -20,9 +21,31 @@ export async function syncAmoChatHistory(chatId: string, leadId: string | null =
     .order('id')
   if (error) throw new Error(`amo history local read: ${error.message}`)
 
-  const existingIds = new Set((local ?? []).map((row) => String(row.amo_message_id)))
+  const localByMessageId = new Map(
+    (local ?? []).map((row) => [String(row.amo_message_id), row] as const)
+  )
+  const existingIds = new Set(localByMessageId.keys())
   const botMessages = (local ?? []).filter((row) => row.sender === 'bot')
   const knownLeadId = leadId || (local ?? []).find((row) => row.lead_id)?.lead_id || null
+  const placeholderUpdates = remote.filter((message) => {
+    const existing = localByMessageId.get(message.amoMessageId)
+    return existing?.text === MANAGER_REPLY_PLACEHOLDER
+      && message.text !== MANAGER_REPLY_PLACEHOLDER
+  })
+  if (placeholderUpdates.length) {
+    const results = await Promise.all(placeholderUpdates.map((message) =>
+      supabase
+        .from('amocrm_messages')
+        .update({
+          text: message.text,
+          author_name: message.authorName,
+          created_at: message.createdAt,
+        })
+        .eq('amo_message_id', message.amoMessageId)
+    ))
+    const updateError = results.find((result) => result.error)?.error
+    if (updateError) throw new Error(`amo history placeholder update: ${updateError.message}`)
+  }
   const rows = remote.flatMap((message) => {
     if (!message.amoMessageId || existingIds.has(message.amoMessageId)) return []
     if (message.direction === 'out') {
