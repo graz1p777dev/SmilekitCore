@@ -374,7 +374,7 @@ async function processInboundAmoMessageNow(input: InboundAmoMessage): Promise<vo
     try {
       const voiceName = text === FIRST_USE_EFFECT ? 'first_use_effect.ogg' : 'not_scam.ogg'
       const voiceBaseUrl = process.env.SMILEKIT_BOT_API_URL?.replace(/\/$/, '')
-      if (voiceReplies.has(text) && voiceBaseUrl) {
+      if (voiceReplies.has(text) && voiceBaseUrl && process.env.AMOCRM_VOICE_SEND_ENABLED === 'true') {
         try {
           await sendAmoChatVoice({
             chatId: input.chatId,
