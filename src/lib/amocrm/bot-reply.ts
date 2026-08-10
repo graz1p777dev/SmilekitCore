@@ -9,7 +9,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { smilekitBotFetch } from '@/lib/smilekit-bot-api'
 import { upsertDealFromInbound } from '@/lib/deals/auto-create'
 import { advanceDealFromBotAction } from '@/lib/deals/advance-stage'
-import { sendAmoChatMessage } from '@/lib/amocrm/chat'
+import { getAmoChatHistory, sendAmoChatMessage, sendAmoChatVoice } from '@/lib/amocrm/chat'
 import { syncAmoChatHistory } from '@/lib/amocrm/history'
 
 export interface InboundAmoMessage {
@@ -19,6 +19,40 @@ export interface InboundAmoMessage {
   contactId: string | null
   authorName: string | null
   text: string
+  messageType?: string
+}
+
+const VOICE_TYPES = new Set(['voice', 'audio'])
+const MAX_VOICE_BYTES = 20 * 1024 * 1024
+
+async function transcribeAmoVoice(input: InboundAmoMessage): Promise<string | null> {
+  if (!VOICE_TYPES.has(input.messageType ?? '')) return input.text
+  let remote = null
+  for (let attempt = 0; attempt < 3 && !remote?.mediaUrl; attempt++) {
+    if (attempt) await new Promise((resolve) => setTimeout(resolve, 500 * 2 ** attempt))
+    remote = (await getAmoChatHistory(input.chatId, 200))
+      .find((message) => message.amoMessageId === input.amoMessageId) ?? null
+  }
+  if (!remote?.mediaUrl) return null
+  const response = await fetch(remote.mediaUrl, { signal: AbortSignal.timeout(20_000) })
+  if (!response.ok) throw new Error(`amo voice download: HTTP ${response.status}`)
+  const size = Number(response.headers.get('content-length') || 0)
+  if (size > MAX_VOICE_BYTES) throw new Error('amo voice download: file is too large')
+  const audio = Buffer.from(await response.arrayBuffer())
+  if (!audio.length || audio.length > MAX_VOICE_BYTES) throw new Error('amo voice download: invalid size')
+  const extension = new URL(remote.mediaUrl).pathname.match(/\.([a-z0-9]{2,5})$/i)?.[1] ?? 'm4a'
+  const result = await smilekitBotFetch<{ transcript: string }>('/internal/transcribe', {
+    method: 'POST',
+    body: {
+      audioBase64: audio.toString('base64'),
+      filename: `${remote.messageType === 'audio' ? 'audio' : 'voice'}.${extension}`,
+    },
+  })
+  return result.ok ? result.data.transcript.trim() || null : null
+}
+
+function normalizedPhone(value: string | null): string {
+  return (value ?? '').replace(/\D/g, '')
 }
 
 // ─── Скрипт продаж — порт из Telegram-бота (smilekit_bot/templates.py,
@@ -35,7 +69,7 @@ const PRODUCT_INFO =
 const CITY_QUESTION = 'Подскажите, пожалуйста, из какого вы города?'
 
 const FIRST_USE_EFFECT =
-  'Вот такой эффект будет уже после первого применения😁. После курса эффект будет постоянный✅😊'
+  'Гарантированно увидите эффект с первого раза 😁. После курса эффект будет постоянный✅😊'
 
 const ORDER_CHECKLIST =
   'Чтобы оформить заказ, пожалуйста, отправьте 😊\n\n' +
@@ -81,7 +115,7 @@ const ORDER_INTENT =
 // «у большинства». Срабатывает на сомнения в честности/реальности ДО покупки.
 const DOUBT_RESULT_REPLY =
   'Вы можете зайти в наш Instagram и посмотреть результаты других клиентов. ' +
-  'Мы гарантируем эффект уже после первого применения.'
+  'Гарантированно увидите эффект с первого раза.'
 
 // sales.py: _SCAM_DOUBT + формулировки из реальных диалогов WhatsApp
 // («это все реально да», «без обмана»). Проверяется раньше жалоб —
@@ -169,6 +203,12 @@ export function processInboundAmoMessage(input: InboundAmoMessage): Promise<void
  */
 async function processInboundAmoMessageNow(input: InboundAmoMessage): Promise<void> {
   const supabase = createAdminClient()
+  const transcript = await transcribeAmoVoice(input)
+  if (VOICE_TYPES.has(input.messageType ?? '') && !transcript) {
+    console.error('amocrm bot-reply: voice transcription failed', input.amoMessageId)
+    return
+  }
+  if (transcript) input = { ...input, text: transcript }
 
   // Идемпотентность: ретрай вебхука с тем же amo_message_id не отвечает дважды.
   const { data: inserted, error: insertError } = await supabase
@@ -202,6 +242,10 @@ async function processInboundAmoMessageNow(input: InboundAmoMessage): Promise<vo
     .eq('name', 'amoCRM')
     .maybeSingle()
   const botEnabled = Boolean((integration as { is_active?: boolean } | null)?.is_active)
+  const testerEnabled = Boolean(
+    normalizedPhone(process.env.AMOCRM_TEST_PHONE ?? null)
+    && normalizedPhone(process.env.AMOCRM_TEST_PHONE ?? null) === normalizedPhone(input.authorName)
+  )
   await upsertDealFromInbound({
     externalKey,
     source: 'amocrm',
@@ -235,7 +279,7 @@ async function processInboundAmoMessageNow(input: InboundAmoMessage): Promise<vo
     }
   }
 
-  if (!botEnabled) return
+  if (!botEnabled && !testerEnabled) return
 
   // История чата: всё до текущего сообщения, старые → новые.
   const { data: rows } = await supabase
@@ -256,6 +300,7 @@ async function processInboundAmoMessageNow(input: InboundAmoMessage): Promise<vo
 
   // Скриптовые ветки — как в Telegram-обработчике (__main__.py), без ИИ.
   const replies: string[] = []
+  const voiceReplies = new Set<string>()
   let stageAction: string | null = null
   const deliveryTemplate = deliveryTemplateForCity(input.text)
 
@@ -264,6 +309,7 @@ async function processInboundAmoMessageNow(input: InboundAmoMessage): Promise<vo
     replies.push(`${PRODUCT_INFO}\n\n${CITY_QUESTION}`)
   } else if (SCAM_DOUBT.test(input.text)) {
     replies.push(DOUBT_RESULT_REPLY)
+    voiceReplies.add(DOUBT_RESULT_REPLY)
   } else if (COMPLAINT.test(input.text)) {
     replies.push(COMPLAINT_PROMPT)
   } else if (COOPERATION.test(input.text)) {
@@ -275,7 +321,8 @@ async function processInboundAmoMessageNow(input: InboundAmoMessage): Promise<vo
     stageAction = 'order'
   } else if (deliveryTemplate && (historyText.includes('цена') || historyText.includes('сом'))) {
     // Клиент назвал город после цены — готовый сценарий: доставка, эффект, CTA.
-    replies.push(deliveryTemplate, FIRST_USE_EFFECT, 'Вам оформить доставку?')
+    replies.push(deliveryTemplate, FIRST_USE_EFFECT, 'Оформить вам? Пока есть в наличии.')
+    voiceReplies.add(FIRST_USE_EFFECT)
   }
 
   if (replies.length === 0) {
@@ -322,12 +369,24 @@ async function processInboundAmoMessageNow(input: InboundAmoMessage): Promise<vo
       return
     }
     try {
-      await sendAmoChatMessage({
-        chatId: input.chatId,
-        leadId: input.leadId,
-        contactId: input.contactId,
-        text,
-      })
+      const voiceName = text === FIRST_USE_EFFECT ? 'first_use_effect.ogg' : 'not_scam.ogg'
+      const voiceBaseUrl = process.env.SMILEKIT_BOT_API_URL?.replace(/\/$/, '')
+      if (voiceReplies.has(text) && voiceBaseUrl) {
+        try {
+          await sendAmoChatVoice({
+            chatId: input.chatId,
+            leadId: input.leadId,
+            contactId: input.contactId,
+            transcript: text,
+            mediaUrl: `${voiceBaseUrl}/media/voice/${voiceName}`,
+          })
+        } catch (error) {
+          console.error('amocrm bot-reply: voice send failed, using text', error)
+          await sendAmoChatMessage({ chatId: input.chatId, leadId: input.leadId, contactId: input.contactId, text })
+        }
+      } else {
+        await sendAmoChatMessage({ chatId: input.chatId, leadId: input.leadId, contactId: input.contactId, text })
+      }
     } catch (error) {
       await supabase.from('amocrm_messages').delete().eq('amo_message_id', botMessageId)
       console.error('amocrm bot-reply: send failed', error)

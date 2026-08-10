@@ -79,6 +79,8 @@ export interface AmoChatHistoryMessage {
   direction: 'in' | 'out'
   authorName: string | null
   text: string
+  messageType: string
+  mediaUrl: string | null
   createdAt: string
 }
 
@@ -121,6 +123,8 @@ async function getHistoryWithSession(
       direction: item.recipient ? 'out' as const : 'in' as const,
       authorName: author.name ? String(author.name) : null,
       text,
+      messageType: type,
+      mediaUrl: media || null,
       createdAt: new Date(createdAt * 1000).toISOString(),
     }]
   }).sort((a, b) => a.createdAt.localeCompare(b.createdAt))
@@ -136,7 +140,22 @@ export async function sendAmoChatMessage(input: SendChatMessageInput): Promise<v
   }
 }
 
-async function sendWithSession(session: ChatSession, { chatId, leadId, contactId, text }: SendChatMessageInput): Promise<void> {
+export async function sendAmoChatVoice(
+  input: Omit<SendChatMessageInput, 'text'> & { mediaUrl: string; transcript: string }
+): Promise<void> {
+  try {
+    await sendWithSession(await getChatSession(), { ...input, text: input.transcript }, 'voice')
+  } catch {
+    await sendWithSession(await getChatSession(true), { ...input, text: input.transcript }, 'voice')
+  }
+}
+
+async function sendWithSession(
+  session: ChatSession,
+  input: SendChatMessageInput & { mediaUrl?: string },
+  messageType: 'text' | 'voice' = 'text'
+): Promise<void> {
+  const { chatId, leadId, contactId, text } = input
   const payload = new URLSearchParams({
     silent: 'false',
     priority: 'low',
@@ -147,6 +166,10 @@ async function sendWithSession(session: ChatSession, { chatId, leadId, contactId
     crm_contact_id: contactId ?? '',
     skip_link_shortener: 'false',
   })
+  if (messageType === 'voice' && input.mediaUrl) {
+    payload.set('type', 'voice')
+    payload.set('media', input.mediaUrl)
+  }
   const res = await fetch(`${AMOJO_BASE_URL}/v1/chats/${session.accountId}/${chatId}/messages`, {
     method: 'POST',
     headers: {

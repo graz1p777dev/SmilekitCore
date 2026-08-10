@@ -92,11 +92,12 @@ function extractChatMessages(payload: Record<string, unknown>): {
       contactId: fields['contact_id'] || null,
       authorName: fields['author.name'] || null,
       text,
+      messageType: fields['message_type'] || 'text',
     }
     if (fields['type'] === 'incoming') {
-      // Медиа без текста боту не разобрать — сохранится в историю через
-      // registerOutgoing нельзя (это входящее), просто не отвечаем на него.
-      if ((fields['text'] ?? '').trim()) incoming.push(message)
+      if ((fields['text'] ?? '').trim() || ['voice', 'audio'].includes(fields['message_type'])) {
+        incoming.push(message)
+      }
     } else if (fields['type'] === 'outgoing') {
       outgoing.push(message)
     }
