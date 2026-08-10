@@ -76,6 +76,18 @@ function deliveryTemplateForCity(text: string): string | null {
 const ORDER_INTENT =
   /хочу\s+(?:заказать|купить|взять)|(?:как|где)\s+(?:заказать|купить|оформить)|закажу|заказать|оформить|оформляйте|оформляем|\bберу\b|возьму|можно\s+оформить|реквизит|куда\s+(?:скинуть|перевести|оплатить|платить)|как\s+оплатить|способ\s+оплаты|\bqr[\s-]?код/i
 
+// templates.py: DOUBT_RESULT_REPLY — дословно по ТЗ, «гарантируем», без
+// «у большинства». Срабатывает на сомнения в честности/реальности ДО покупки.
+const DOUBT_RESULT_REPLY =
+  'Вы можете зайти в наш Instagram и посмотреть результаты других клиентов. ' +
+  'Мы гарантируем эффект уже после первого применения.'
+
+// sales.py: _SCAM_DOUBT + формулировки из реальных диалогов WhatsApp
+// («это все реально да», «без обмана»). Проверяется раньше жалоб —
+// слова пересекаются.
+const SCAM_DOUBT =
+  /(?:вы\s+)?(?:точно\s+)?не\s+мошенник|мошенники\s*\?|(?:это\s+)?(?:точно\s+)?не\s+(?:обман|развод|скам|фейк)|без\s+обмана|(?:это\s+)?(?:все|всё)?\s*реально\s*(?:да|\?)|не\s+кин[её]те|вам\s+можно\s+доверять|можно\s+(?:ли\s+)?вам\s+верить|вы\s+настоящие/i
+
 // sales.py: _COMPLAINT_MARKERS / _COOPERATION_MARKERS.
 const COMPLAINT =
   /развод|обман(?:ули)?|кинул|мошенник|верните\s+деньги|хочу\s+возврат|ужасн(?:о|ый|ая)|отвратительн|никогда\s+(?:больше\s+)?не\s+куплю|не\s+помогл|разочарован/i
@@ -189,6 +201,8 @@ async function processInboundAmoMessageNow(input: InboundAmoMessage): Promise<vo
   if (history.length === 0) {
     // Первый контакт — дословный скрипт: цена + вопрос о городе.
     replies.push(`${PRODUCT_INFO}\n\n${CITY_QUESTION}`)
+  } else if (SCAM_DOUBT.test(input.text)) {
+    replies.push(DOUBT_RESULT_REPLY)
   } else if (COMPLAINT.test(input.text)) {
     replies.push(COMPLAINT_PROMPT)
     stageAction = 'non_standard_request'
