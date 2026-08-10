@@ -105,6 +105,30 @@ async function proxy(request: NextRequest, context: RouteContext) {
     return NextResponse.json({ detail: "Forbidden" }, { status: 403 });
   }
 
+  // ИИ-помощник: у SmileKit нет FastAPI-бэкенда DemiResults, на который
+  // рассчитан этот прокси (BOT_BACKEND_API_URL не задан → localhost:8000 →
+  // ECONNREFUSED, помощник не работал никогда). Отвечаем локально DeepSeek'ом.
+  if (cleanPath === "copilot/chat" && request.method === "POST") {
+    try {
+      const body = await request.json().catch(() => ({}));
+      const { localCopilotChat } = await import("@/lib/copilot/local-chat");
+      const result = await localCopilotChat(
+        typeof body?.message === "string" ? body.message : "",
+        typeof body?.conversation_id === "number" ? body.conversation_id : null,
+        body?.page_context ?? null
+      );
+      return NextResponse.json(result);
+    } catch (error) {
+      console.error("copilot local chat failed", error);
+      return NextResponse.json({ detail: "copilot_failed" }, { status: 502 });
+    }
+  }
+  // Кнопки-действия старого бэкенда локальный помощник не создаёт — отмена
+  // приходит только от страницы при закрытии, отвечаем успехом.
+  if (/^copilot\/actions\/[^/]+\/(cancel|confirm)$/.test(cleanPath) && request.method === "POST") {
+    return NextResponse.json({ ok: true });
+  }
+
   // Заголовки собираем с нуля, а не копируем из запроса: иначе браузерные cookie
   // с сессией Supabase уезжают в бэкенд бота, а подставленный клиентом
   // X-Admin-API-Key прошёл бы насквозь, если серверный ключ не задан.
