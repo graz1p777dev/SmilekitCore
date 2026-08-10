@@ -2,15 +2,17 @@
 
 import { useCallback, useEffect, useRef, useState, useTransition } from 'react'
 import { toast } from 'sonner'
-import { Bot, MessageCircle, Pause, Play, Send, User } from 'lucide-react'
+import { Bot, MessageCircle, Pause, Play, Power, Send, User } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import {
+  getAmoBotEnabled,
   getBotChatMessages,
   getBotChats,
   pauseBotChat,
   resumeBotChat,
   sendOperatorMessage,
+  setAmoBotEnabled,
 } from '@/actions/smilekit-dialogs'
 import type {
   SmilekitChatMessage,
@@ -42,6 +44,7 @@ export function SmilekitDialogsClient() {
   const [messages, setMessages] = useState<SmilekitChatMessage[]>([])
   const [paused, setPaused] = useState(false)
   const [draft, setDraft] = useState('')
+  const [amoBotEnabled, setAmoBotEnabledState] = useState<boolean | null>(null)
   const [busy, startBusy] = useTransition()
   const scrollRef = useRef<HTMLDivElement>(null)
   const selectedRef = useRef<number | null>(null)
@@ -66,12 +69,29 @@ export function SmilekitDialogsClient() {
 
   useEffect(() => {
     refreshChats()
+    getAmoBotEnabled().then((result) => {
+      if (result.success) setAmoBotEnabledState(result.enabled)
+    })
     const id = setInterval(() => {
       refreshChats()
       if (selectedRef.current != null) refreshThread(selectedRef.current)
     }, POLL_INTERVAL_MS)
     return () => clearInterval(id)
   }, [refreshChats, refreshThread])
+
+  function handleToggleAmoBot() {
+    if (amoBotEnabled == null) return
+    const next = !amoBotEnabled
+    startBusy(async () => {
+      const result = await setAmoBotEnabled(next)
+      if (!result.success) {
+        toast.error(result.error)
+        return
+      }
+      setAmoBotEnabledState(next)
+      toast.success(next ? 'Бот amoCRM включён — отвечает клиентам' : 'Бот amoCRM ВЫКЛЮЧЕН — молчит во всех чатах')
+    })
+  }
 
   useEffect(() => {
     if (selected == null) return
@@ -115,15 +135,30 @@ export function SmilekitDialogsClient() {
 
   return (
     <div className="flex flex-col gap-5 p-4 md:p-8">
-      <div>
-        <div className="kicker">Telegram-бот Smilekit</div>
-        <h1 className="block-title" style={{ marginTop: 7 }}>
-          Диалоги
-        </h1>
-        <p className="mt-2 text-sm" style={{ color: 'var(--ink-3)' }}>
-          Вся переписка бота с клиентами. Видно, чей каждый ответ — бота или менеджера. Ручной ответ
-          автоматически ставит бота на паузу в этом чате.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="kicker">Telegram-бот Smilekit</div>
+          <h1 className="block-title" style={{ marginTop: 7 }}>
+            Диалоги
+          </h1>
+          <p className="mt-2 text-sm" style={{ color: 'var(--ink-3)' }}>
+            Вся переписка бота с клиентами. Видно, чей каждый ответ — бота или менеджера. Ручной ответ
+            автоматически ставит бота на паузу в этом чате.
+          </p>
+        </div>
+        <button
+          onClick={handleToggleAmoBot}
+          disabled={busy || amoBotEnabled == null}
+          className="flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold"
+          style={
+            amoBotEnabled
+              ? { background: '#dcfce7', color: '#15803d', border: '1px solid #86efac' }
+              : { background: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5' }
+          }
+        >
+          <Power size={15} />
+          {amoBotEnabled == null ? '…' : amoBotEnabled ? 'Бот amoCRM: ВКЛ — выключить' : 'Бот amoCRM: ВЫКЛЮЧЕН — включить'}
+        </button>
       </div>
 
       {error && (

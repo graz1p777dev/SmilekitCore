@@ -20,6 +20,68 @@ export interface InboundAmoMessage {
   text: string
 }
 
+// ─── Скрипт продаж — порт из Telegram-бота (smilekit_bot/templates.py,
+// sales.py, __main__.py). Тексты дословно по ТЗ, держим синхронно с ботом.
+// Отличие канала: QR-картинку и фото в WhatsApp через amojo не передать,
+// поэтому на этапе оплаты сделка передаётся менеджеру.
+
+const PRODUCT_INFO =
+  'Здравствуйте! 😊\n\n' +
+  'SmileKit помогает заметно отбелить зубы уже после первого применения.\n\n' +
+  '📦 В наборе 14 отбеливающих полосок — это полный курс.\n\n' +
+  '💰 ЦЕНА — 1490 СОМ.🇰🇬'
+
+const CITY_QUESTION = 'Подскажите, пожалуйста, из какого вы города?'
+
+const FIRST_USE_EFFECT =
+  'Вот такой эффект будет уже после первого применения😁. После курса эффект будет постоянный✅😊'
+
+const ORDER_CHECKLIST =
+  'Чтобы оформить заказ, пожалуйста, отправьте 😊\n\n' +
+  '• адрес доставки;\n\n' +
+  '• ваше имя;\n\n' +
+  '• номер телефона.\n\n' +
+  'Менеджер свяжется с вами для оплаты и подтверждения заказа.'
+
+const COMPLAINT_PROMPT = 'Подскажите, пожалуйста, что вас не устроило — для улучшения нашего сервиса.'
+
+const COOPERATION_REPLY =
+  'Спасибо за интерес! Вопросами сотрудничества и опта занимается наш менеджер — он свяжется с вами в ближайшее время.'
+
+const DELIVERY_TEMPLATES: [RegExp, string][] = [
+  [/бишкек|токмок/, 'Отлично, у нас есть доставка через Яндекс, за 30 минут доставим'],
+  [
+    /\bош\b|джалал-?абад|каракол|нарын|талас|баткен|балыкч/,
+    'Да, у нас есть доставка через Ылдам Экспресс 🚚✅. Если оформить сейчас, доставка будет уже завтра или послезавтра',
+  ],
+  [/алмат/, 'Да, доставим! В Алматы — ориентировочно в течение 30 минут'],
+  [/астан/, 'Да, доставим! По остальным регионам Казахстана — ориентировочно за 1–3 дня'],
+  [/ташкент/, 'Да, доставим! В Ташкенте — ориентировочно в течение 1 часа'],
+  [
+    /москв|росси/,
+    'Своего склада в России нет, отправляем через СДЭК — доставка от 7 дней. Точную стоимость доставки уточним отдельно',
+  ],
+]
+
+function deliveryTemplateForCity(text: string): string | null {
+  const normalized = text.toLowerCase()
+  for (const [pattern, template] of DELIVERY_TEMPLATES) {
+    if (pattern.test(normalized)) return template
+  }
+  return null
+}
+
+// sales.py: _ORDER_INTENT + _PAYMENT_INFO_REQUEST — клиент готов оформлять
+// или спрашивает, как платить.
+const ORDER_INTENT =
+  /хочу\s+(?:заказать|купить|взять)|(?:как|где)\s+(?:заказать|купить|оформить)|закажу|заказать|оформить|оформляйте|оформляем|\bберу\b|возьму|можно\s+оформить|реквизит|куда\s+(?:скинуть|перевести|оплатить|платить)|как\s+оплатить|способ\s+оплаты|\bqr[\s-]?код/i
+
+// sales.py: _COMPLAINT_MARKERS / _COOPERATION_MARKERS.
+const COMPLAINT =
+  /развод|обман(?:ули)?|кинул|мошенник|верните\s+деньги|хочу\s+возврат|ужасн(?:о|ый|ая)|отвратительн|никогда\s+(?:больше\s+)?не\s+куплю|не\s+помогл|разочарован/i
+const COOPERATION =
+  /сотрудничеств|оптом|\bопт\b|дистрибьютор|дилер|партн[её]р|реселлер|перепродаж|b2b|блогер/i
+
 // Порт stage_action_for_inbound из бота (smilekit_bot/crm.py) — та же
 // трёхуровневая эвристика намерения. Держим синхронно с ботом.
 const READY_TO_BUY = /оформ(?:ить|ляйте)|заказ(?:ать|ываю)?|беру\b|покупаю\b|заброниру|резервиру/i
@@ -87,14 +149,23 @@ async function processInboundAmoMessageNow(input: InboundAmoMessage): Promise<vo
   if (!inserted?.length) return // дубль — уже обработано
 
   const externalKey = input.leadId ? `amocrm:${input.leadId}` : `amocrm-chat:${input.chatId}`
+  // Аварийный выключатель: integrations.amoCRM.is_active. Выключен — историю
+  // и сделки продолжаем вести, но клиенту не отвечаем и этапы не двигаем.
+  const { data: integration } = await supabase
+    .from('integrations')
+    .select('is_active')
+    .eq('name', 'amoCRM')
+    .maybeSingle()
+  const botEnabled = Boolean((integration as { is_active?: boolean } | null)?.is_active)
   await upsertDealFromInbound({
     externalKey,
     source: 'amocrm',
     customerName: input.authorName,
     customerPhone: input.authorName?.match(/^\+?[\d\s()-]{7,}$/) ? input.authorName : null,
   })
+  if (!botEnabled) return
 
-  // История чата для ИИ: всё до текущего сообщения, старые → новые.
+  // История чата: всё до текущего сообщения, старые → новые.
   const { data: rows } = await supabase
     .from('amocrm_messages')
     .select('sender, text, id')
@@ -108,41 +179,76 @@ async function processInboundAmoMessageNow(input: InboundAmoMessage): Promise<vo
       role: (row as { sender: string }).sender === 'client' ? 'user' : 'assistant',
       content: (row as { text: string }).text,
     }))
+  const historyText = history.map((item) => item.content.toLowerCase()).join(' ')
 
-  const lab = await smilekitBotFetch<{ reply: string }>('/internal/lab', {
-    method: 'POST',
-    body: { message: input.text, history },
-  })
-  if (!lab.ok) {
-    console.error('amocrm bot-reply: lab failed', lab.error)
-    return
+  // Скриптовые ветки — как в Telegram-обработчике (__main__.py), без ИИ.
+  const replies: string[] = []
+  let stageAction: string | null = null
+  const deliveryTemplate = deliveryTemplateForCity(input.text)
+
+  if (history.length === 0) {
+    // Первый контакт — дословный скрипт: цена + вопрос о городе.
+    replies.push(`${PRODUCT_INFO}\n\n${CITY_QUESTION}`)
+  } else if (COMPLAINT.test(input.text)) {
+    replies.push(COMPLAINT_PROMPT)
+    stageAction = 'non_standard_request'
+  } else if (COOPERATION.test(input.text)) {
+    replies.push(COOPERATION_REPLY)
+    stageAction = 'non_standard_request'
+  } else if (ORDER_INTENT.test(input.text)) {
+    // Готов оформлять. QR в WhatsApp не передать — данные собирает бот,
+    // оплату закрывает менеджер: сделка сразу «Передан менеджеру».
+    replies.push(ORDER_CHECKLIST)
+    stageAction = 'order'
+  } else if (deliveryTemplate && (historyText.includes('цена') || historyText.includes('сом'))) {
+    // Клиент назвал город после цены — готовый сценарий: доставка, эффект, CTA.
+    replies.push(deliveryTemplate, FIRST_USE_EFFECT, 'Вам оформить доставку?')
   }
-  const reply = lab.data.reply?.trim()
-  if (!reply) return
 
-  try {
-    await sendAmoChatMessage({
-      chatId: input.chatId,
-      leadId: input.leadId,
-      contactId: input.contactId,
-      text: reply,
+  if (replies.length === 0) {
+    // Не скриптовый случай — обычная генерация тем же мозгом бота
+    // (черновик менеджера + супервизор из настроек CRM).
+    const lab = await smilekitBotFetch<{ reply: string }>('/internal/lab', {
+      method: 'POST',
+      body: { message: input.text, history },
     })
-  } catch (error) {
-    console.error('amocrm bot-reply: send failed', error)
-    return
+    if (!lab.ok) {
+      console.error('amocrm bot-reply: lab failed', lab.error)
+      return
+    }
+    const reply = lab.data.reply?.trim()
+    if (!reply) return
+    replies.push(reply)
   }
 
-  await supabase.from('amocrm_messages').insert({
-    amo_message_id: `bot:${input.amoMessageId}`,
-    chat_id: input.chatId,
-    lead_id: input.leadId,
-    contact_id: input.contactId,
-    direction: 'out',
-    sender: 'bot',
-    text: reply,
-  })
+  for (let index = 0; index < replies.length; index++) {
+    const text = replies[index]
+    try {
+      await sendAmoChatMessage({
+        chatId: input.chatId,
+        leadId: input.leadId,
+        contactId: input.contactId,
+        text,
+      })
+    } catch (error) {
+      console.error('amocrm bot-reply: send failed', error)
+      return
+    }
+    await supabase.from('amocrm_messages').insert({
+      amo_message_id: `bot:${input.amoMessageId}:${index}`,
+      chat_id: input.chatId,
+      lead_id: input.leadId,
+      contact_id: input.contactId,
+      direction: 'out',
+      sender: 'bot',
+      text,
+    })
+    if (index < replies.length - 1) {
+      await new Promise((resolve) => setTimeout(resolve, 900 + Math.random() * 500))
+    }
+  }
 
-  const action = stageActionForInbound(input.text)
+  const action = stageAction ?? stageActionForInbound(input.text)
   if (action) {
     const result = await advanceDealFromBotAction(externalKey, action)
     if (!result.ok && result.error) {
