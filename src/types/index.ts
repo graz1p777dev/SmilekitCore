@@ -566,12 +566,14 @@ export interface DealEvent {
   created_at: string
 }
 
-// Сообщение переписки, привязанной к сделке (витрина или Wazzup).
+// Сообщение переписки, привязанной к сделке (витрина, Wazzup или amoCRM).
 export interface DealMessage {
   id: string
   direction: 'in' | 'out'
   text: string
   created_at: string
+  /** Автор исходящего для amoCRM-канала: ИИ-бот или живой менеджер. */
+  sender?: 'client' | 'bot' | 'operator'
 }
 
 // Облегчённая карточка сотрудника — для пикера ответственного и аватара.

@@ -194,7 +194,10 @@ export default function TaskModal({
             <div className="space-y-1.5">
               <Label>Этап</Label>
               <Select value={form.status} onValueChange={(v) => set('status', v as TaskStatus)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                {/* Base UI Select без children показывает сырой value — подпись явно. */}
+                <SelectTrigger>
+                  <SelectValue>{TASK_COLUMNS.find((c) => c.key === form.status)?.label ?? form.status}</SelectValue>
+                </SelectTrigger>
                 <SelectContent>
                   {TASK_COLUMNS.map((c) => (
                     <SelectItem key={c.key} value={c.key}>{c.label}</SelectItem>
@@ -205,7 +208,9 @@ export default function TaskModal({
             <div className="space-y-1.5">
               <Label>Приоритет</Label>
               <Select value={form.priority} onValueChange={(v) => set('priority', v as TaskPriority)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue>{TASK_PRIORITY[form.priority]?.label ?? form.priority}</SelectValue>
+                </SelectTrigger>
                 <SelectContent>
                   {TASK_PRIORITY_ORDER.map((p) => (
                     <SelectItem key={p} value={p}>{TASK_PRIORITY[p].label}</SelectItem>

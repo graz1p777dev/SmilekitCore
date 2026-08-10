@@ -194,7 +194,20 @@ export default function DealModal({
             <div className="space-y-1.5">
               <Label>Этап</Label>
               <Select value={form.stage_id} onValueChange={(v) => set('stage_id', v as string)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                {/* Base UI Select без children показывает сырой value (UUID) —
+                    имя этапа рендерим явно. */}
+                <SelectTrigger>
+                  <SelectValue>
+                    <span className="flex items-center gap-2">
+                      <span
+                        className="h-2 w-2 rounded-full"
+                        style={{ background: stages.find((s) => s.id === form.stage_id)?.color ?? '#d1d5db' }}
+                        aria-hidden
+                      />
+                      {stages.find((s) => s.id === form.stage_id)?.name ?? 'Выберите этап'}
+                    </span>
+                  </SelectValue>
+                </SelectTrigger>
                 <SelectContent>
                   {stages.map((s) => (
                     <SelectItem key={s.id} value={s.id}>
@@ -218,7 +231,11 @@ export default function DealModal({
                 value={form.responsible_employee_id || 'none'}
                 onValueChange={(v) => set('responsible_employee_id', v === 'none' ? '' : (v as string))}
               >
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue>
+                    {employees.find((e) => e.id === form.responsible_employee_id)?.name ?? 'Не назначен'}
+                  </SelectValue>
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Не назначен</SelectItem>
                   {employees.map((e) => (
@@ -317,6 +334,11 @@ export default function DealModal({
                           : 'ml-auto text-white brand-gradient'
                       )}
                     >
+                      {m.direction === 'out' && (m.sender === 'bot' || m.sender === 'operator') && (
+                        <span className="mb-0.5 block text-[10px] font-semibold opacity-80">
+                          {m.sender === 'bot' ? '🤖 Бот' : '👤 Менеджер'}
+                        </span>
+                      )}
                       {m.text}
                     </div>
                   ))}

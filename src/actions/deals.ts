@@ -313,6 +313,32 @@ export async function getDealConversation(dealId: string): Promise<DealConversat
     return { messages, note: messages.length ? null : 'Сообщений пока нет' }
   }
 
+  if (deal.external_key?.startsWith('amocrm:')) {
+    // Переписка WhatsApp-канала amoCRM живёт у нас (amocrm_messages,
+    // миграция 041) — сервер мастер истории, см. src/lib/amocrm/bot-reply.ts.
+    const leadId = deal.external_key.slice('amocrm:'.length)
+    const { data: rows } = await supabase
+      .from('amocrm_messages')
+      .select('id, direction, sender, text, created_at')
+      .eq('lead_id', leadId)
+      .order('id')
+      .limit(200)
+    const messages: DealMessage[] = ((rows ?? []) as {
+      id: number
+      direction: 'in' | 'out'
+      sender: 'client' | 'bot' | 'operator'
+      text: string
+      created_at: string
+    }[]).map((row) => ({
+      id: String(row.id),
+      direction: row.direction,
+      sender: row.sender,
+      text: row.text,
+      created_at: row.created_at,
+    }))
+    return { messages, note: messages.length ? null : 'Сообщений пока нет' }
+  }
+
   if (!deal.external_key) {
     return { messages: [], note: 'Сделка заведена вручную — переписки нет' }
   }
