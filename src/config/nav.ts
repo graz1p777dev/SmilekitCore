@@ -33,6 +33,7 @@ import {
   Sparkles,
   Handshake,
   Package,
+  MessagesSquare,
 } from 'lucide-react'
 
 export const NAV_GROUPS: NavGroup[] = [
@@ -73,6 +74,14 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: 'AI Бот',
     items: [
+      {
+        // Переписка бота с клиентами: видно, чей ответ (бот/менеджер),
+        // можно ответить вручную — бот в этом чате встаёт на паузу.
+        href: '/dashboard/dialogs',
+        label: 'Диалоги',
+        icon: MessagesSquare,
+        roles: ['owner', 'rop', 'mp'],
+      },
       {
         href: '/dashboard/bot-analytics',
         label: 'Аналитика бота',

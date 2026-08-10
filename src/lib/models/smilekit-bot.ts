@@ -32,3 +32,25 @@ export interface SmilekitBotEvent {
   details: Record<string, unknown> | null
   createdAt: number
 }
+
+/** Чат из списка «Диалоги» — /internal/chats (storage.py: list_chats). */
+export interface SmilekitChatSummary {
+  chatId: number
+  lastAt: number
+  lastText: string | null
+  lastSender: SmilekitMessageSender | null
+  paused: boolean
+}
+
+/** Кто написал сообщение: клиент, ИИ-бот или менеджер вручную из CRM. */
+export type SmilekitMessageSender = 'client' | 'bot' | 'operator'
+
+/** Сообщение переписки — /internal/chats/{id}/messages (storage.py: chat_messages). */
+export interface SmilekitChatMessage {
+  id: number
+  role: 'user' | 'assistant'
+  content: string
+  kind: string
+  createdAt: number
+  sender: SmilekitMessageSender
+}
