@@ -55,6 +55,31 @@ interface FormState {
   note: string
 }
 
+const AMO_MEDIA_MESSAGE = /^\[([^\]]+)]\s+(https:\/\/\S+)$/i
+
+function ChatMessageContent({ text }: { text: string }) {
+  const media = text.match(AMO_MEDIA_MESSAGE)
+  if (!media) return text
+  const type = media[1].toLowerCase()
+  const label = type === 'picture' || type === 'image'
+    ? '📷 Открыть фото'
+    : type === 'video'
+      ? '🎬 Открыть видео'
+      : type === 'audio' || type === 'voice'
+        ? '🎤 Открыть аудио'
+        : '📎 Открыть вложение'
+  return (
+    <a
+      href={media[2]}
+      target="_blank"
+      rel="noreferrer"
+      className="font-medium underline underline-offset-2"
+    >
+      {label}
+    </a>
+  )
+}
+
 export default function DealModal({
   deal,
   isNew,
@@ -339,7 +364,7 @@ export default function DealModal({
                           {m.sender === 'bot' ? '🤖 Бот' : '👤 Менеджер'}
                         </span>
                       )}
-                      {m.text}
+                      <ChatMessageContent text={m.text} />
                     </div>
                   ))}
                 </div>
