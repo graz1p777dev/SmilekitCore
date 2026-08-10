@@ -218,7 +218,15 @@ async function processInboundAmoMessageNow(input: InboundAmoMessage): Promise<vo
     }
     const reply = lab.data.reply?.trim()
     if (!reply) return
-    replies.push(reply)
+    // Бот делит длинный ответ тегом <NEXT_MESSAGE> (Telegram шлёт частями) —
+    // в WhatsApp тег утекал клиенту текстом. Делим так же, как Telegram.
+    replies.push(
+      ...reply
+        .split(/<NEXT_MESSAGE>/i)
+        .map((part) => part.trim())
+        .filter(Boolean)
+    )
+    if (replies.length === 0) return
   }
 
   for (let index = 0; index < replies.length; index++) {
