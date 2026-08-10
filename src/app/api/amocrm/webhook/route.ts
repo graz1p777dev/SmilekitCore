@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { upsertDealFromInbound } from '@/lib/deals/auto-create'
+import { processInboundAmoMessage } from '@/lib/amocrm/bot-reply'
 
 // Вебхук amoCRM (Настройки → Интеграции → Webhooks на towhite.amocrm.ru).
 // Секрет в query string — единственная проверка, что запрос от amoCRM (сам
@@ -38,7 +39,44 @@ export async function POST(request: NextRequest) {
     if (result.error) console.error('amocrm webhook deal upsert failed', leadId, result.error)
   }
 
+  // Входящие сообщения чатов (вебхук add_message): ответ ИИ занимает секунды,
+  // а амо отключает вебхук за таймауты — поэтому 200 сразу, работа detached.
+  for (const message of extractInboundMessages(parsed)) {
+    void processInboundAmoMessage(message).catch((error) =>
+      console.error('amocrm inbound processing failed', message.amoMessageId, error)
+    )
+  }
+
   return NextResponse.json({ ok: true })
+}
+
+/** Входящие сообщения из form-ключей message[add][N][...]. Эхо наших же
+ * исходящих (type=outgoing) пропускаем — на них отвечать нельзя. */
+function extractInboundMessages(payload: Record<string, unknown>): import('@/lib/amocrm/bot-reply').InboundAmoMessage[] {
+  const byIndex = new Map<string, Record<string, string>>()
+  for (const [key, value] of Object.entries(payload)) {
+    const match = key.match(/^message\[add\]\[(\d+)\]\[([^\]]+)\](?:\[([^\]]+)\])?$/)
+    if (!match || typeof value !== 'string') continue
+    const [, index, field, subfield] = match
+    const bucket = byIndex.get(index) ?? {}
+    bucket[subfield ? `${field}.${subfield}` : field] = value
+    byIndex.set(index, bucket)
+  }
+  const result: import('@/lib/amocrm/bot-reply').InboundAmoMessage[] = []
+  for (const fields of byIndex.values()) {
+    if (fields['type'] !== 'incoming') continue
+    const text = (fields['text'] ?? '').trim()
+    if (!fields['id'] || !fields['chat_id'] || !text) continue
+    result.push({
+      amoMessageId: fields['id'],
+      chatId: fields['chat_id'],
+      leadId: fields['entity_id'] || fields['element_id'] || null,
+      contactId: fields['contact_id'] || null,
+      authorName: fields['author.name'] || null,
+      text,
+    })
+  }
+  return result
 }
 
 /** id лидов из form-urlencoded ключей leads[add][N][id] / leads[status][N][id]. */
