@@ -35,12 +35,32 @@ function stageActionForInbound(text: string): string | null {
   return null
 }
 
+// Сообщения одного чата обрабатываем строго по очереди: два входящих с
+// разницей в секунды иначе генерят два параллельных ответа с одинаковым
+// контекстом (клиент получает дубль). Один инстанс на Railway — внутрипроцессной
+// цепочки достаточно.
+const chatQueues = new Map<string, Promise<void>>()
+
+export function processInboundAmoMessage(input: InboundAmoMessage): Promise<void> {
+  const prev = chatQueues.get(input.chatId) ?? Promise.resolve()
+  const run = prev.then(() => processInboundAmoMessageNow(input))
+  const chain = run.then(
+    () => {},
+    () => {}
+  )
+  chatQueues.set(input.chatId, chain)
+  chain.then(() => {
+    if (chatQueues.get(input.chatId) === chain) chatQueues.delete(input.chatId)
+  })
+  return run
+}
+
 /**
  * Полный цикл на входящее сообщение: сохранить → сделка → ответ ИИ →
  * отправить в amo → сохранить ответ → продвинуть этап.
  * Вызывается detached из вебхука (амо ждёт 200 быстро) — все сбои в console.
  */
-export async function processInboundAmoMessage(input: InboundAmoMessage): Promise<void> {
+async function processInboundAmoMessageNow(input: InboundAmoMessage): Promise<void> {
   const supabase = createAdminClient()
 
   // Идемпотентность: ретрай вебхука с тем же amo_message_id не отвечает дважды.
