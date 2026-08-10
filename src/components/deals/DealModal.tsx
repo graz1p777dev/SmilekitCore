@@ -51,6 +51,8 @@ interface FormState {
   customer_name: string
   customer_phone: string
   customer_username: string
+  city: string
+  address: string
   responsible_employee_id: string
   note: string
 }
@@ -102,6 +104,8 @@ export default function DealModal({
     customer_name: deal?.customer_name ?? '',
     customer_phone: deal?.customer_phone ?? '',
     customer_username: deal?.customer_username ?? '',
+    city: deal?.city ?? '',
+    address: deal?.address ?? '',
     responsible_employee_id: deal?.responsible_employee_id ?? '',
     note: deal?.note ?? '',
   }))
@@ -142,6 +146,8 @@ export default function DealModal({
       customer_name: form.customer_name || null,
       customer_phone: form.customer_phone || null,
       customer_username: form.customer_username || null,
+      city: form.city || null,
+      address: form.address || null,
       responsible_employee_id: form.responsible_employee_id || null,
       note: form.note || null,
     }
@@ -320,6 +326,27 @@ export default function DealModal({
                 value={form.customer_username}
                 onChange={(e) => set('customer_username', e.target.value)}
                 placeholder="@username"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-[180px_1fr] gap-3">
+            <div className="space-y-1.5">
+              <Label>Город</Label>
+              <Input
+                value={form.city}
+                onChange={(e) => set('city', e.target.value)}
+                placeholder="Бишкек"
+                maxLength={120}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Адрес</Label>
+              <Input
+                value={form.address}
+                onChange={(e) => set('address', e.target.value)}
+                placeholder="Улица, дом, квартира"
+                maxLength={500}
               />
             </div>
           </div>

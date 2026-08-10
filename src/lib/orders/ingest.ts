@@ -179,6 +179,16 @@ export async function ingestOrder(input: InboundOrder): Promise<IngestOrderResul
 
   if (error) return { created: false, id: null, error: error.message }
 
+  // Если бот уже узнал город при оформлении, показываем его и в сделке.
+  // Ручное значение менеджера не перезаписываем.
+  if (dealId && order.city) {
+    await supabase
+      .from('deals')
+      .update({ city: order.city })
+      .eq('id', dealId)
+      .is('city', null)
+  }
+
   const row = (inserted ?? [])[0] as { id: string } | undefined
   if (!row) {
     // Гонка: строку успел вставить параллельный запрос. Заказ есть — это успех.

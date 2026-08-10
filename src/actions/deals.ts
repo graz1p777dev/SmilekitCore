@@ -95,6 +95,8 @@ const DealSchema = z.object({
   customer_name: z.string().nullable().optional(),
   customer_phone: z.string().nullable().optional(),
   customer_username: z.string().nullable().optional(),
+  city: z.string().max(120, 'Слишком длинное название города').nullable().optional(),
+  address: z.string().max(500, 'Слишком длинный адрес').nullable().optional(),
   responsible_employee_id: z.string().uuid().nullable().optional(),
   note: z.string().nullable().optional(),
 })
@@ -124,6 +126,8 @@ export async function createDeal(input: DealFormData): Promise<DealActionResult<
       customer_name: clean(d.customer_name),
       customer_phone: clean(d.customer_phone),
       customer_username: clean(d.customer_username),
+      city: clean(d.city),
+      address: clean(d.address),
       source: 'manual' satisfies DealSource,
       responsible_employee_id: d.responsible_employee_id ?? null,
       note: clean(d.note),
@@ -161,6 +165,8 @@ export async function updateDeal(id: string, input: DealFormData): Promise<DealA
       customer_name: clean(d.customer_name),
       customer_phone: clean(d.customer_phone),
       customer_username: clean(d.customer_username),
+      city: clean(d.city),
+      address: clean(d.address),
       responsible_employee_id: d.responsible_employee_id ?? null,
       note: clean(d.note),
     })

@@ -1,6 +1,6 @@
 'use client'
 
-import { Clock, GripVertical, Phone } from 'lucide-react'
+import { Clock, GripVertical, MapPin, Phone } from 'lucide-react'
 import { formatMoney, getInitials } from '@/lib/formatters'
 import { cn } from '@/lib/utils'
 import type { Deal, DealEmployee } from '@/types'
@@ -106,6 +106,13 @@ export default function DealCard({
           <span className="inline-flex items-center gap-1 rounded-md bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-500">
             <Phone size={10} />
             {deal.customer_phone}
+          </span>
+        )}
+
+        {deal.city && (
+          <span className="inline-flex items-center gap-1 rounded-md bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-500">
+            <MapPin size={10} />
+            {deal.city}
           </span>
         )}
       </div>

@@ -34,6 +34,8 @@ export async function POST(request: Request) {
     customerName?: string | null
     customerPhone?: string | null
     customerUsername?: string | null
+    city?: string | null
+    address?: string | null
   }
   try {
     payload = await request.json()
@@ -54,6 +56,8 @@ export async function POST(request: Request) {
     customerName: payload.customerName,
     customerPhone: payload.customerPhone,
     customerUsername: payload.customerUsername,
+    city: payload.city,
+    address: payload.address,
   })
 
   if (result.error) {

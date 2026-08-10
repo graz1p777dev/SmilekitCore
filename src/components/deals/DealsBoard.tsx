@@ -124,7 +124,7 @@ export default function DealsBoard({ initialStages, initialDeals, employees, me 
     const q = search.trim().toLowerCase()
     if (!q) return deals
     return deals.filter((d) =>
-      `${d.title} ${d.customer_name ?? ''} ${d.customer_phone ?? ''} ${d.customer_username ?? ''}`
+      `${d.title} ${d.customer_name ?? ''} ${d.customer_phone ?? ''} ${d.customer_username ?? ''} ${d.city ?? ''} ${d.address ?? ''}`
         .toLowerCase()
         .includes(q)
     )

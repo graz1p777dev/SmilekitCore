@@ -21,6 +21,8 @@ export interface InboundDeal {
   customerName?: string | null
   customerPhone?: string | null
   customerUsername?: string | null
+  city?: string | null
+  address?: string | null
 }
 
 const SOURCE_FALLBACK: Record<DealSource, string> = {
@@ -86,6 +88,8 @@ export async function upsertDealFromInbound(input: InboundDeal): Promise<UpsertD
         customer_name: input.customerName?.trim() || null,
         customer_phone: input.customerPhone?.trim() || null,
         customer_username: input.customerUsername?.trim() || null,
+        city: input.city?.trim().slice(0, 120) || null,
+        address: input.address?.trim().slice(0, 500) || null,
       },
       { onConflict: 'external_key', ignoreDuplicates: true }
     )

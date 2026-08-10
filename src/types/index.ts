@@ -546,6 +546,8 @@ export interface Deal {
   customer_name: string | null
   customer_phone: string | null
   customer_username: string | null
+  city: string | null
+  address: string | null
   source: DealSource
   external_key: string | null
   responsible_employee_id: string | null
