@@ -251,6 +251,10 @@ export async function reconcileDealsFromShop(): Promise<
 > {
   const me = await getViewer()
   if (!me) return { success: false, error: 'Нет авторизации' }
+  // У SmileKit витрины нет — сделки живут в amoCRM: сверяемся с ним.
+  if (process.env.AMOCRM_DOMAIN && process.env.AMOCRM_ACCESS_TOKEN) {
+    return reconcileDealsFromAmo()
+  }
   if (!isShopConfigured()) {
     return { success: false, error: 'Интеграция с витриной не настроена' }
   }
@@ -274,6 +278,74 @@ export async function reconcileDealsFromShop(): Promise<
 
   revalidatePath('/dashboard/deals')
   return { success: true, data: { created, checked: conversations.length } }
+}
+
+/**
+ * Сверка с amoCRM: все лиды + неразобранные заявки → сделки у нас.
+ * Идемпотентно по external_key `amocrm:<lead_id>` — дублей не создаёт,
+ * существующие сделки не трогает. То же, что делает вебхук, но разом
+ * по всей базе амо (страховка от пропущенных вебхуков).
+ */
+async function reconcileDealsFromAmo(): Promise<DealActionResult<{ created: number; checked: number }>> {
+  const domain = process.env.AMOCRM_DOMAIN
+  const token = process.env.AMOCRM_ACCESS_TOKEN
+  const headers = { authorization: `Bearer ${token}` }
+
+  const fetchAll = async (path: string, embeddedKey: string) => {
+    const items: Record<string, unknown>[] = []
+    for (let page = 1; page <= 40; page++) {
+      const res = await fetch(`https://${domain}${path}?limit=250&page=${page}`, { headers })
+      if (res.status === 204) break
+      if (!res.ok) throw new Error(`amoCRM ${path}: HTTP ${res.status}`)
+      const data = await res.json()
+      const batch = data?._embedded?.[embeddedKey] ?? []
+      if (!batch.length) break
+      items.push(...batch)
+      if (!data._links?.next) break
+    }
+    return items
+  }
+
+  try {
+    const [unsorted, leads] = await Promise.all([
+      fetchAll('/api/v4/leads/unsorted', 'unsorted'),
+      fetchAll('/api/v4/leads', 'leads'),
+    ])
+
+    const rows = new Map<string, { title: string; phone: string | null }>()
+    for (const item of unsorted) {
+      const embedded = item['_embedded'] as { leads?: { id?: number }[] } | undefined
+      const leadId = embedded?.leads?.[0]?.id
+      if (!leadId) continue
+      const metadata = item['metadata'] as { from?: string; client?: { name?: string } } | undefined
+      const phone = metadata?.from ?? null
+      rows.set(String(leadId), {
+        title: metadata?.client?.name || phone || `Заявка amoCRM ${leadId}`,
+        phone,
+      })
+    }
+    for (const lead of leads) {
+      const id = String(lead['id'])
+      if (rows.has(id)) continue
+      rows.set(id, { title: (lead['name'] as string) || `Сделка amoCRM ${id}`, phone: null })
+    }
+
+    let created = 0
+    for (const [leadId, row] of rows) {
+      const upsert = await upsertDealFromInbound({
+        externalKey: `amocrm:${leadId}`,
+        source: 'amocrm',
+        customerName: row.title,
+        customerPhone: row.phone,
+      })
+      if (upsert.created) created += 1
+    }
+
+    revalidatePath('/dashboard/deals')
+    return { success: true, data: { created, checked: rows.size } }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Сбой сверки с amoCRM' }
+  }
 }
 
 // ─── Переписка по сделке ─────────────────────────────────────────────────────
