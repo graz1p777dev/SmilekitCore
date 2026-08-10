@@ -109,6 +109,38 @@ function stageActionForInbound(text: string): string | null {
   return null
 }
 
+/**
+ * Исходящее сообщение из вебхука. Если это НЕ эхо только что отправленного
+ * ботом текста — в чат вступил живой менеджер (из амо или WhatsApp Business):
+ * сохраняем как operator, и бот этот чат больше не трогает вообще
+ * (см. проверку в processInboundAmoMessageNow).
+ */
+export async function registerOutgoingAmoMessage(input: InboundAmoMessage): Promise<void> {
+  const supabase = createAdminClient()
+  const { data: recentBot } = await supabase
+    .from('amocrm_messages')
+    .select('id')
+    .eq('chat_id', input.chatId)
+    .eq('sender', 'bot')
+    .eq('text', input.text)
+    .gte('created_at', new Date(Date.now() - 5 * 60_000).toISOString())
+    .limit(1)
+  if (recentBot?.length) return // эхо нашей же отправки через amojo
+
+  await supabase.from('amocrm_messages').upsert(
+    {
+      amo_message_id: input.amoMessageId,
+      chat_id: input.chatId,
+      lead_id: input.leadId,
+      contact_id: input.contactId,
+      direction: 'out',
+      sender: 'operator',
+      text: input.text,
+    },
+    { onConflict: 'amo_message_id', ignoreDuplicates: true }
+  )
+}
+
 // Сообщения одного чата обрабатываем строго по очереди: два входящих с
 // разницей в секунды иначе генерят два параллельных ответа с одинаковым
 // контекстом (клиент получает дубль). Один инстанс на Railway — внутрипроцессной
@@ -176,6 +208,16 @@ async function processInboundAmoMessageNow(input: InboundAmoMessage): Promise<vo
     customerPhone: input.authorName?.match(/^\+?[\d\s()-]{7,}$/) ? input.authorName : null,
   })
   if (!botEnabled) return
+
+  // В чате уже писал живой менеджер — бот его не трогает вообще: ни ответов,
+  // ни этапов. Диалог целиком ведёт человек.
+  const { data: operatorRows } = await supabase
+    .from('amocrm_messages')
+    .select('id')
+    .eq('chat_id', input.chatId)
+    .eq('sender', 'operator')
+    .limit(1)
+  if (operatorRows?.length) return
 
   // История чата: всё до текущего сообщения, старые → новые.
   const { data: rows } = await supabase
