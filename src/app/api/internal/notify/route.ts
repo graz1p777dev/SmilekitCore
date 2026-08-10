@@ -14,6 +14,7 @@ const VALID_TYPES: readonly NotificationType[] = [
   'salary_ready', 'finance_alert', 'system', 'sale',
   'consultation_booked', 'consultation_reminder', 'sale_lead',
   'server_load', 'deploy', 'security', 'audit',
+  'order_new',
 ]
 
 export async function POST(request: Request) {

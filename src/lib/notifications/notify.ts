@@ -24,6 +24,7 @@ export type NotificationType =
   | 'deploy'
   | 'security'
   | 'audit'
+  | 'order_new'
 
 export interface NotifyInput {
   type: NotificationType

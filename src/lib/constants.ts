@@ -49,6 +49,7 @@ export const NOTIFICATION_TYPE_MAP: Record<
 > = {
   server_load:            { label: 'Нагрузка сервера',     icon: '⚠️', color: '#5115a4', bg: '#fee2e2' },
   sale_lead:               { label: 'Хочет купить',         icon: '🛒', color: '#166534', bg: '#bbf7d0' },
+  order_new:                { label: 'Новый заказ',          icon: '📦', color: '#5115a4', bg: '#f1ebfa' },
   consultation_booked:     { label: 'Запись на консультацию', icon: '📅', color: '#5115a4', bg: '#f1ebfa' },
   consultation_reminder:   { label: 'Скоро консультация',   icon: '⏰', color: '#92400e', bg: '#fef3c7' },
   deploy:                   { label: 'Деплой',               icon: '🚀', color: '#5115a4', bg: '#f1ebfa' },
