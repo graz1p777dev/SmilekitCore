@@ -11,6 +11,7 @@ import { getDealsData, moveDeal, reconcileDealsFromShop } from '@/actions/deals'
 import { stageSoft } from './deal-config'
 import DealCard from './DealCard'
 import DealModal from './DealModal'
+import { AmoBotToggle } from './AmoBotToggle'
 
 interface Props {
   initialStages: DealStage[]
@@ -186,6 +187,7 @@ export default function DealsBoard({ initialStages, initialDeals, employees, me 
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          <AmoBotToggle />
           <div className="relative">
             <Search size={15} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
