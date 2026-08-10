@@ -54,7 +54,13 @@ export async function POST(request: NextRequest) {
       )
     }
     for (const message of incoming) {
-      await processInboundAmoMessage(message).catch((error) =>
+      const details = message.leadId ? await fetchLeadDetails(message.leadId) : null
+      await processInboundAmoMessage({
+        ...message,
+        authorName: message.authorName || details?.name || null,
+        customerPhone: details?.phone
+          || (message.authorName?.match(/^\+?[\d\s()-]{7,}$/) ? message.authorName : null),
+      }).catch((error) =>
         console.error('amocrm inbound processing failed', message.amoMessageId, error)
       )
     }

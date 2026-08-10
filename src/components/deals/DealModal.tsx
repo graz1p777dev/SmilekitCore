@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useTransition } from 'react'
-import { X, Trash2, MessagesSquare } from 'lucide-react'
+import { X, Trash2, MessagesSquare, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
@@ -95,6 +95,7 @@ export default function DealModal({
   const [isPending, startTransition] = useTransition()
   const [messages, setMessages] = useState<DealMessage[] | null>(null)
   const [chatNote, setChatNote] = useState<string | null>(null)
+  const [conversationReload, setConversationReload] = useState(0)
 
   const [form, setForm] = useState<FormState>(() => ({
     title: deal?.title ?? '',
@@ -117,15 +118,31 @@ export default function DealModal({
   useEffect(() => {
     if (isNew || !deal) return
     let alive = true
-    void getDealConversation(deal.id).then((res) => {
+    const timeout = window.setTimeout(() => {
       if (!alive) return
-      setMessages(res.messages)
-      setChatNote(res.note)
-    })
+      alive = false
+      setMessages([])
+      setChatNote('amoCRM не ответила вовремя. Нажмите «Повторить».')
+    }, 12_000)
+    void getDealConversation(deal.id)
+      .then((res) => {
+        if (!alive) return
+        window.clearTimeout(timeout)
+        setMessages(res.messages)
+        setChatNote(res.note)
+      })
+      .catch((error) => {
+        if (!alive) return
+        window.clearTimeout(timeout)
+        console.error('deal conversation load failed', error)
+        setMessages([])
+        setChatNote('Не удалось загрузить переписку. Нажмите «Повторить».')
+      })
     return () => {
       alive = false
+      window.clearTimeout(timeout)
     }
-  }, [isNew, deal])
+  }, [isNew, deal, conversationReload])
 
   const handleSave = () => {
     if (!form.title.trim()) {
@@ -182,8 +199,8 @@ export default function DealModal({
   const SourceIcon = source.icon
 
   return (
-    <Modal onClose={onClose}>
-      <div className="flex max-h-[88vh] w-[min(620px,94vw)] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+    <Modal onClose={onClose} variant="right">
+      <div className="flex h-[100dvh] w-[min(760px,100vw)] flex-col overflow-hidden bg-white shadow-2xl animate-in slide-in-from-right duration-200">
         {/* Шапка */}
         <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
           <div className="flex items-center gap-2.5">
@@ -371,11 +388,25 @@ export default function DealModal({
               {messages === null ? (
                 <p className="text-[12px] text-gray-400">Загружаем диалог…</p>
               ) : messages.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-gray-200 px-4 py-5 text-center text-[12px] text-gray-400">
-                  {chatNote ?? 'Переписки нет'}
+                <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-gray-200 px-4 py-5 text-center text-[12px] text-gray-400">
+                  <span>{chatNote ?? 'Переписки нет'}</span>
+                  {chatNote?.includes('Повторить') && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMessages(null)
+                        setChatNote(null)
+                        setConversationReload((value) => value + 1)
+                      }}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-[#f1ebfa] px-3 py-1.5 font-semibold text-[#5115a4] transition-colors hover:bg-[#e7dcf6]"
+                    >
+                      <RefreshCw size={13} />
+                      Повторить
+                    </button>
+                  )}
                 </div>
               ) : (
-                <div className="max-h-56 space-y-1.5 overflow-y-auto rounded-xl bg-gray-50/70 p-3 scroll-hidden">
+                <div className="max-h-[42vh] space-y-1.5 overflow-y-auto rounded-xl bg-gray-50/70 p-3 scroll-hidden">
                   {messages.map((m) => (
                     <div
                       key={m.id}

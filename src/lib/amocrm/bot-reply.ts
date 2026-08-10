@@ -18,6 +18,7 @@ export interface InboundAmoMessage {
   leadId: string | null
   contactId: string | null
   authorName: string | null
+  customerPhone?: string | null
   text: string
   messageType?: string
 }
@@ -242,15 +243,16 @@ async function processInboundAmoMessageNow(input: InboundAmoMessage): Promise<vo
     .eq('name', 'amoCRM')
     .maybeSingle()
   const botEnabled = Boolean((integration as { is_active?: boolean } | null)?.is_active)
-  const testerEnabled = Boolean(
-    normalizedPhone(process.env.AMOCRM_TEST_PHONE ?? null)
-    && normalizedPhone(process.env.AMOCRM_TEST_PHONE ?? null) === normalizedPhone(input.authorName)
-  )
+  const testPhone = normalizedPhone(process.env.AMOCRM_TEST_PHONE ?? null)
+  const testerEnabled = Boolean(testPhone && testPhone === normalizedPhone(input.customerPhone ?? null))
+  // Пока задан тестовый номер, это строгий allowlist: глобальный выключатель
+  // amoCRM не может случайно включить ответы всем остальным клиентам.
+  const replyAllowed = testPhone ? testerEnabled : botEnabled
   await upsertDealFromInbound({
     externalKey,
     source: 'amocrm',
     customerName: input.authorName,
-    customerPhone: input.authorName?.match(/^\+?[\d\s()-]{7,}$/) ? input.authorName : null,
+    customerPhone: input.customerPhone ?? null,
   })
   try {
     await syncAmoChatHistory(input.chatId, input.leadId)
@@ -282,7 +284,7 @@ async function processInboundAmoMessageNow(input: InboundAmoMessage): Promise<vo
     }
   }
 
-  if (!botEnabled && !testerEnabled) return
+  if (!replyAllowed) return
 
   // История чата: всё до текущего сообщения, старые → новые.
   const { data: rows } = await supabase

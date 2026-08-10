@@ -56,6 +56,7 @@ async function createChatSession(): Promise<ChatSession> {
       'content-type': 'application/x-www-form-urlencoded',
     },
     body: new URLSearchParams({ 'request[chats][session][action]': 'create' }),
+    signal: AbortSignal.timeout(8_000),
   })
   if (!res.ok) throw new Error(`amo chat session: HTTP ${res.status}`)
   const data = await res.json()
@@ -89,7 +90,10 @@ export async function getAmoChatHistory(chatId: string, limit = 200): Promise<Am
   if (!chatId) return []
   try {
     return await getHistoryWithSession(await getChatSession(), chatId, limit)
-  } catch {
+  } catch (error) {
+    // Новая сессия помогает только при протухшем amojo-токене. При таймауте
+    // повтор лишь удваивает ожидание и оставляет карточку сделки «вечной».
+    if (!(error instanceof Error) || !/HTTP (401|403)\b/.test(error.message)) throw error
     return getHistoryWithSession(await getChatSession(true), chatId, limit)
   }
 }
@@ -104,6 +108,7 @@ async function getHistoryWithSession(
   const res = await fetch(url, {
     headers: { 'x-auth-token': session.accessToken, chatId },
     cache: 'no-store',
+    signal: AbortSignal.timeout(8_000),
   })
   if (!res.ok) throw new Error(`amojo history: HTTP ${res.status}`)
   const data = await res.json()
