@@ -207,8 +207,6 @@ async function processInboundAmoMessageNow(input: InboundAmoMessage): Promise<vo
     customerName: input.authorName,
     customerPhone: input.authorName?.match(/^\+?[\d\s()-]{7,}$/) ? input.authorName : null,
   })
-  if (!botEnabled) return
-
   // В чате уже писал живой менеджер — бот его не трогает вообще: ни ответов,
   // ни этапов. Диалог целиком ведёт человек.
   const { data: operatorRows } = await supabase
@@ -218,6 +216,20 @@ async function processInboundAmoMessageNow(input: InboundAmoMessage): Promise<vo
     .eq('sender', 'operator')
     .limit(1)
   if (operatorRows?.length) return
+
+  // Этапы двигаются ВСЕГДА по намерению клиента — даже когда бот выключен:
+  // выключатель глушит только ответы, а не трекинг воронки.
+  const inboundAction = COMPLAINT.test(input.text) || COOPERATION.test(input.text)
+    ? 'non_standard_request'
+    : stageActionForInbound(input.text)
+  if (inboundAction) {
+    const advanced = await advanceDealFromBotAction(externalKey, inboundAction)
+    if (!advanced.ok && advanced.error) {
+      console.error('amocrm bot-reply: stage advance failed', inboundAction, advanced.error)
+    }
+  }
+
+  if (!botEnabled) return
 
   // История чата: всё до текущего сообщения, старые → новые.
   const { data: rows } = await supabase
@@ -247,10 +259,8 @@ async function processInboundAmoMessageNow(input: InboundAmoMessage): Promise<vo
     replies.push(DOUBT_RESULT_REPLY)
   } else if (COMPLAINT.test(input.text)) {
     replies.push(COMPLAINT_PROMPT)
-    stageAction = 'non_standard_request'
   } else if (COOPERATION.test(input.text)) {
     replies.push(COOPERATION_REPLY)
-    stageAction = 'non_standard_request'
   } else if (ORDER_INTENT.test(input.text)) {
     // Готов оформлять. QR в WhatsApp не передать — данные собирает бот,
     // оплату закрывает менеджер: сделка сразу «Передан менеджеру».
@@ -312,11 +322,12 @@ async function processInboundAmoMessageNow(input: InboundAmoMessage): Promise<vo
     }
   }
 
-  const action = stageAction ?? stageActionForInbound(input.text)
-  if (action) {
-    const result = await advanceDealFromBotAction(externalKey, action)
+  // Ветки скрипта могут поднять этап дальше базовой эвристики (например
+  // «order» после чек-листа оформления) — базовый inboundAction уже применён выше.
+  if (stageAction) {
+    const result = await advanceDealFromBotAction(externalKey, stageAction)
     if (!result.ok && result.error) {
-      console.error('amocrm bot-reply: stage advance failed', action, result.error)
+      console.error('amocrm bot-reply: stage advance failed', stageAction, result.error)
     }
   }
 }
