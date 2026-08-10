@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { after, NextRequest, NextResponse } from 'next/server'
 import { upsertDealFromInbound } from '@/lib/deals/auto-create'
 import { processInboundAmoMessage, registerOutgoingAmoMessage } from '@/lib/amocrm/bot-reply'
 
@@ -28,32 +28,37 @@ export async function POST(request: NextRequest) {
 
   console.log('amocrm webhook payload', JSON.stringify({ contentType, parsed }).slice(0, 3000))
 
-  for (const leadId of extractLeadIds(parsed)) {
-    const details = await fetchLeadDetails(leadId)
-    const result = await upsertDealFromInbound({
-      externalKey: `amocrm:${leadId}`,
-      source: 'amocrm',
-      customerName: details?.name ?? null,
-      customerPhone: details?.phone ?? null,
-    })
-    if (result.error) console.error('amocrm webhook deal upsert failed', leadId, result.error)
-  }
-
+  const leadIds = extractLeadIds(parsed)
   // Сообщения чатов (вебхук add_message): ответ ИИ занимает секунды, а амо
-  // отключает вебхук за таймауты — поэтому 200 сразу, работа detached.
+  // отключает вебхук за таймауты — поэтому 200 сразу, а after() гарантирует,
+  // что Next.js не оборвёт фоновую работу после отправки ответа.
   // Исходящие тоже важны: по ним определяем, что в чат вступил живой
   // менеджер — бот такой чат больше не трогает вообще.
   const { incoming, outgoing } = extractChatMessages(parsed)
-  for (const message of outgoing) {
-    void registerOutgoingAmoMessage(message).catch((error) =>
-      console.error('amocrm outgoing processing failed', message.amoMessageId, error)
-    )
-  }
-  for (const message of incoming) {
-    void processInboundAmoMessage(message).catch((error) =>
-      console.error('amocrm inbound processing failed', message.amoMessageId, error)
-    )
-  }
+  after(async () => {
+    for (const leadId of leadIds) {
+      const details = await fetchLeadDetails(leadId)
+      const result = await upsertDealFromInbound({
+        externalKey: `amocrm:${leadId}`,
+        source: 'amocrm',
+        customerName: details?.name ?? null,
+        customerPhone: details?.phone ?? null,
+      })
+      if (result.error) console.error('amocrm webhook deal upsert failed', leadId, result.error)
+    }
+    // Сначала фиксируем исходящие, чтобы менеджер, ответивший между двумя
+    // сообщениями клиента, успел остановить бота до обработки входящего.
+    for (const message of outgoing) {
+      await registerOutgoingAmoMessage(message).catch((error) =>
+        console.error('amocrm outgoing processing failed', message.amoMessageId, error)
+      )
+    }
+    for (const message of incoming) {
+      await processInboundAmoMessage(message).catch((error) =>
+        console.error('amocrm inbound processing failed', message.amoMessageId, error)
+      )
+    }
+  })
 
   return NextResponse.json({ ok: true })
 }

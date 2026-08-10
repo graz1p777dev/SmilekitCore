@@ -10,6 +10,7 @@ import { smilekitBotFetch } from '@/lib/smilekit-bot-api'
 import { upsertDealFromInbound } from '@/lib/deals/auto-create'
 import { advanceDealFromBotAction } from '@/lib/deals/advance-stage'
 import { sendAmoChatMessage } from '@/lib/amocrm/chat'
+import { syncAmoChatHistory } from '@/lib/amocrm/history'
 
 export interface InboundAmoMessage {
   amoMessageId: string
@@ -207,6 +208,11 @@ async function processInboundAmoMessageNow(input: InboundAmoMessage): Promise<vo
     customerName: input.authorName,
     customerPhone: input.authorName?.match(/^\+?[\d\s()-]{7,}$/) ? input.authorName : null,
   })
+  try {
+    await syncAmoChatHistory(input.chatId, input.leadId)
+  } catch (error) {
+    console.error('amocrm bot-reply: history sync failed', error)
+  }
   // В чате уже писал живой менеджер — бот его не трогает вообще: ни ответов,
   // ни этапов. Диалог целиком ведёт человек.
   const { data: operatorRows } = await supabase
@@ -236,6 +242,7 @@ async function processInboundAmoMessageNow(input: InboundAmoMessage): Promise<vo
     .from('amocrm_messages')
     .select('sender, text, id')
     .eq('chat_id', input.chatId)
+    .order('created_at', { ascending: false })
     .order('id', { ascending: false })
     .limit(31)
   const history = (rows ?? [])
@@ -297,6 +304,23 @@ async function processInboundAmoMessageNow(input: InboundAmoMessage): Promise<vo
 
   for (let index = 0; index < replies.length; index++) {
     const text = replies[index]
+    const botMessageId = `bot:${input.amoMessageId}:${index}`
+    // Записываем до отправки: исходящий webhook amoCRM может вернуться раньше,
+    // чем завершится sendAmoChatMessage. Тогда он всё равно распознается как
+    // эхо бота, а не как вступивший в чат менеджер.
+    const { error: reserveError } = await supabase.from('amocrm_messages').upsert({
+      amo_message_id: botMessageId,
+      chat_id: input.chatId,
+      lead_id: input.leadId,
+      contact_id: input.contactId,
+      direction: 'out',
+      sender: 'bot',
+      text,
+    }, { onConflict: 'amo_message_id', ignoreDuplicates: true })
+    if (reserveError) {
+      console.error('amocrm bot-reply: bot message reserve failed', reserveError.message)
+      return
+    }
     try {
       await sendAmoChatMessage({
         chatId: input.chatId,
@@ -305,18 +329,10 @@ async function processInboundAmoMessageNow(input: InboundAmoMessage): Promise<vo
         text,
       })
     } catch (error) {
+      await supabase.from('amocrm_messages').delete().eq('amo_message_id', botMessageId)
       console.error('amocrm bot-reply: send failed', error)
       return
     }
-    await supabase.from('amocrm_messages').insert({
-      amo_message_id: `bot:${input.amoMessageId}:${index}`,
-      chat_id: input.chatId,
-      lead_id: input.leadId,
-      contact_id: input.contactId,
-      direction: 'out',
-      sender: 'bot',
-      text,
-    })
     if (index < replies.length - 1) {
       await new Promise((resolve) => setTimeout(resolve, 900 + Math.random() * 500))
     }

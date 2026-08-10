@@ -11,6 +11,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { shopFetch, isShopConfigured } from '@/lib/shop-api'
 import { upsertDealFromInbound } from '@/lib/deals/auto-create'
+import { syncAmoChatHistory } from '@/lib/amocrm/history'
 import type {
   Deal,
   DealEmployee,
@@ -389,10 +390,25 @@ export async function getDealConversation(dealId: string): Promise<DealConversat
     // Переписка WhatsApp-канала amoCRM живёт у нас (amocrm_messages,
     // миграция 041) — сервер мастер истории, см. src/lib/amocrm/bot-reply.ts.
     const leadId = deal.external_key.slice('amocrm:'.length)
+    const admin = createAdminClient()
+    const { data: chatRow } = await admin
+      .from('amocrm_messages')
+      .select('chat_id')
+      .eq('lead_id', leadId)
+      .limit(1)
+      .maybeSingle()
+    if (chatRow?.chat_id) {
+      try {
+        await syncAmoChatHistory(String(chatRow.chat_id), leadId)
+      } catch (error) {
+        console.error('deal conversation: amo history sync failed', error)
+      }
+    }
     const { data: rows } = await supabase
       .from('amocrm_messages')
       .select('id, direction, sender, text, created_at')
       .eq('lead_id', leadId)
+      .order('created_at')
       .order('id')
       .limit(200)
     const messages: DealMessage[] = ((rows ?? []) as {

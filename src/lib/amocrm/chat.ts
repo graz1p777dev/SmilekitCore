@@ -73,6 +73,59 @@ export interface SendChatMessageInput {
   text: string
 }
 
+export interface AmoChatHistoryMessage {
+  amoMessageId: string
+  leadId: string | null
+  direction: 'in' | 'out'
+  authorName: string | null
+  text: string
+  createdAt: string
+}
+
+/** Живая история чата amoCRM, включая сообщения до подключения вебхука. */
+export async function getAmoChatHistory(chatId: string, limit = 200): Promise<AmoChatHistoryMessage[]> {
+  if (!chatId) return []
+  try {
+    return await getHistoryWithSession(await getChatSession(), chatId, limit)
+  } catch {
+    return getHistoryWithSession(await getChatSession(true), chatId, limit)
+  }
+}
+
+async function getHistoryWithSession(
+  session: ChatSession,
+  chatId: string,
+  limit: number
+): Promise<AmoChatHistoryMessage[]> {
+  const url = new URL(`${AMOJO_BASE_URL}/v1/chats/${session.accountId}/${chatId}/messages`)
+  url.searchParams.set('limit', String(Math.max(1, Math.min(limit, 200))))
+  const res = await fetch(url, {
+    headers: { 'x-auth-token': session.accessToken, chatId },
+    cache: 'no-store',
+  })
+  if (!res.ok) throw new Error(`amojo history: HTTP ${res.status}`)
+  const data = await res.json()
+  if (!Array.isArray(data)) return []
+  return data.flatMap((item: Record<string, unknown>) => {
+    const message = (item.message ?? {}) as Record<string, unknown>
+    const type = String(message.type || 'text')
+    const media = typeof message.media === 'string' ? message.media : ''
+    const text = String(message.text || item.text || '').trim() || (media ? `[${type}] ${media}` : '')
+    const createdAt = Number(item.created_at)
+    if (!item.id || !text || !createdAt) return []
+    const author = (item.author ?? {}) as Record<string, unknown>
+    const dialog = (item.dialog ?? {}) as Record<string, unknown>
+    return [{
+      amoMessageId: String(item.id),
+      leadId: dialog.entity_id ? String(dialog.entity_id) : null,
+      direction: item.recipient ? 'out' as const : 'in' as const,
+      authorName: author.name ? String(author.name) : null,
+      text,
+      createdAt: new Date(createdAt * 1000).toISOString(),
+    }]
+  }).sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+}
+
 /** Отправляет текст клиенту в чат amoCRM. Кэшированная сессия; при её
  * протухании — одна пересборка сессии и повтор. Бросает при сбое. */
 export async function sendAmoChatMessage(input: SendChatMessageInput): Promise<void> {
