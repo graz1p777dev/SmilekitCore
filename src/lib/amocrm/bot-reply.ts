@@ -265,7 +265,10 @@ async function processInboundAmoMessageNow(input: InboundAmoMessage): Promise<vo
     .eq('chat_id', input.chatId)
     .eq('sender', 'operator')
     .limit(1)
-  if (operatorRows?.length) return
+  // В production менеджер навсегда останавливает автответы в этом чате.
+  // Единственное исключение — явно заданный тестовый номер: так проверяем
+  // интеграцию на владельце, не включая бота остальным клиентам.
+  if (operatorRows?.length && !testerEnabled) return
 
   // Этапы двигаются ВСЕГДА по намерению клиента — даже когда бот выключен:
   // выключатель глушит только ответы, а не трекинг воронки.
