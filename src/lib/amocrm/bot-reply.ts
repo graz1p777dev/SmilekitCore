@@ -9,7 +9,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { smilekitBotFetch } from '@/lib/smilekit-bot-api'
 import { upsertDealFromInbound } from '@/lib/deals/auto-create'
 import { advanceDealFromBotAction } from '@/lib/deals/advance-stage'
-import { getAmoChatHistory, sendAmoChatMessage, sendAmoChatVoice } from '@/lib/amocrm/chat'
+import { getAmoChatHistory, sendAmoChatMessage, sendAmoChatPicture, sendAmoChatVoice } from '@/lib/amocrm/chat'
 import { syncAmoChatHistory } from '@/lib/amocrm/history'
 
 export interface InboundAmoMessage {
@@ -62,6 +62,16 @@ const PRODUCT_INFO =
   'SmileKit помогает заметно отбелить зубы уже после первого применения.\n\n' +
   '📦 В наборе 14 отбеливающих полосок — это полный курс.\n\n' +
   '💰 ЦЕНА — 1490 СОМ.🇰🇬'
+
+const KYRGYZ_PRODUCT_INFO =
+  'Салам! 😊 Бир кутусу — 1490 сом. Ичинде 14 даана тилке бар, 7 жолу колдонууга жетет. ' +
+  'Таасири биринчи колдонуудан кийин эле байкалат.\n\n' +
+  'Кайсы шаардан болосуз? Жеткирүү боюнча айтып берем.'
+
+const KYRGYZ_MARKERS =
+  /баа|наркы|канча|кайсы|шаар|жеткир|тиш|агарт|колдон|куту|барбы|алам|керек|рахмат|болобу|кантип|эмне/i
+const KYRGYZ_PRICE_INTENT = /баа|наркы|канча\s*(?:сом|турат)/i
+const WHATSAPP_WAITING_PLACEHOLDER = /ожидание сообщения.*проверьте свой телефон/i
 
 const CITY_QUESTION = 'Подскажите, пожалуйста, из какого вы города?'
 
@@ -346,14 +356,24 @@ async function processInboundAmoMessageNow(input: InboundAmoMessage, alreadyStor
       content: (row as { text: string }).text,
     }))
   const historyText = history.map((item) => item.content.toLowerCase()).join(' ')
+  const recentHistoryText = history.slice(-3).map((item) => item.content).join(' ')
+  // Иногда WhatsApp присылает техническую заглушку сразу после настоящего
+  // сообщения. В таком случае определяем язык и намерение по свежей истории.
+  const languageContext = WHATSAPP_WAITING_PLACEHOLDER.test(input.text)
+    ? recentHistoryText
+    : input.text
+  const isKyrgyz = KYRGYZ_MARKERS.test(languageContext)
 
   // Скриптовые ветки — как в Telegram-обработчике (__main__.py), без ИИ.
   const replies: string[] = []
   const voiceReplies = new Set<string>()
+  let sendResultPhotos = false
   let stageAction: string | null = null
   const deliveryTemplate = deliveryTemplateForCity(input.text)
 
-  if (history.length === 0) {
+  if (isKyrgyz && KYRGYZ_PRICE_INTENT.test(languageContext)) {
+    replies.push(KYRGYZ_PRODUCT_INFO)
+  } else if (history.length === 0) {
     // Первый контакт — дословный скрипт: цена + вопрос о городе.
     replies.push(`${PRODUCT_INFO}\n\n${CITY_QUESTION}`)
   } else if (SCAM_DOUBT.test(input.text)) {
@@ -376,15 +396,19 @@ async function processInboundAmoMessageNow(input: InboundAmoMessage, alreadyStor
         ? 'Оформить вам? Пока есть в наличии.'
         : LOW_STOCK_DISCOUNT_CTA
     )
+    sendResultPhotos = true
     voiceReplies.add(FIRST_USE_EFFECT)
   }
 
   if (replies.length === 0) {
     // Не скриптовый случай — обычная генерация тем же мозгом бота
     // (черновик менеджера + супервизор из настроек CRM).
+    const labMessage = isKyrgyz
+      ? `${input.text}\n\nЖоопту толугу менен кыргыз тилинде бер. Орусча сөздөрдү аралаштырба.`
+      : input.text
     const lab = await smilekitBotFetch<{ reply: string }>('/internal/lab', {
       method: 'POST',
-      body: { message: input.text, history },
+      body: { message: labMessage, history },
     })
     if (!lab.ok) {
       console.error('amocrm bot-reply: lab failed', lab.error)
@@ -445,6 +469,40 @@ async function processInboundAmoMessageNow(input: InboundAmoMessage, alreadyStor
       await supabase.from('amocrm_messages').delete().eq('amo_message_id', botMessageId)
       console.error('amocrm bot-reply: send failed', error)
       return
+    }
+    if (sendResultPhotos && index === 0) {
+      const mediaBaseUrl = process.env.SMILEKIT_BOT_API_URL?.replace(/\/$/, '')
+      if (mediaBaseUrl) {
+        for (const [name, caption] of [['before.jpg', 'До'], ['after.jpg', 'После']] as const) {
+          const photoMessageId = `bot:${input.amoMessageId}:result:${name}`
+          const { error: photoReserveError } = await supabase.from('amocrm_messages').upsert({
+            amo_message_id: photoMessageId,
+            chat_id: input.chatId,
+            lead_id: input.leadId,
+            contact_id: input.contactId,
+            direction: 'out',
+            sender: 'bot',
+            text: caption,
+          }, { onConflict: 'amo_message_id', ignoreDuplicates: true })
+          if (photoReserveError) {
+            console.error('amocrm bot-reply: result photo reserve failed', photoReserveError.message)
+            continue
+          }
+          try {
+            await sendAmoChatPicture({
+              chatId: input.chatId,
+              leadId: input.leadId,
+              contactId: input.contactId,
+              caption,
+              mediaUrl: `${mediaBaseUrl}/media/results/${name}`,
+            })
+          } catch (error) {
+            await supabase.from('amocrm_messages').delete().eq('amo_message_id', photoMessageId)
+            console.error('amocrm bot-reply: result photo send failed', error)
+          }
+          await new Promise((resolve) => setTimeout(resolve, 700))
+        }
+      }
     }
     if (index < replies.length - 1) {
       await new Promise((resolve) => setTimeout(resolve, 900 + Math.random() * 500))

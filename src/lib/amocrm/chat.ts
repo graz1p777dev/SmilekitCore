@@ -155,10 +155,20 @@ export async function sendAmoChatVoice(
   }
 }
 
+export async function sendAmoChatPicture(
+  input: Omit<SendChatMessageInput, 'text'> & { mediaUrl: string; caption: string }
+): Promise<void> {
+  try {
+    await sendWithSession(await getChatSession(), { ...input, text: input.caption }, 'picture')
+  } catch {
+    await sendWithSession(await getChatSession(true), { ...input, text: input.caption }, 'picture')
+  }
+}
+
 async function sendWithSession(
   session: ChatSession,
   input: SendChatMessageInput & { mediaUrl?: string },
-  messageType: 'text' | 'voice' = 'text'
+  messageType: 'text' | 'voice' | 'picture' = 'text'
 ): Promise<void> {
   const { chatId, leadId, contactId, text } = input
   const payload = new URLSearchParams({
@@ -171,8 +181,8 @@ async function sendWithSession(
     crm_contact_id: contactId ?? '',
     skip_link_shortener: 'false',
   })
-  if (messageType === 'voice' && input.mediaUrl) {
-    payload.set('type', 'voice')
+  if (messageType !== 'text' && input.mediaUrl) {
+    payload.set('type', messageType)
     payload.set('media', input.mediaUrl)
   }
   const res = await fetch(`${AMOJO_BASE_URL}/v1/chats/${session.accountId}/${chatId}/messages`, {
