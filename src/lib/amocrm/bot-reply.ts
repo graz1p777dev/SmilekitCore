@@ -68,6 +68,10 @@ const CITY_QUESTION = 'Подскажите, пожалуйста, из како
 const FIRST_USE_EFFECT =
   'Гарантированно увидите эффект с первого раза 😁. После курса эффект будет постоянный✅😊'
 
+const LOW_STOCK_DISCOUNT_CTA =
+  'Кстати, у нас осталось буквально 2 упаковки, поэтому мы их отдаем по скидке 10% ☺️\n' +
+  'Оформить вам доставку ?)'
+
 const ORDER_CHECKLIST =
   'Чтобы оформить заказ, пожалуйста, отправьте 😊\n\n' +
   '• адрес доставки;\n\n' +
@@ -301,6 +305,17 @@ async function processInboundAmoMessageNow(input: InboundAmoMessage, alreadyStor
   } catch (error) {
     console.error('amocrm bot-reply: history sync failed', error)
   }
+  // Как только в диалог вступил менеджер, бот больше не отвечает в этом
+  // чате. Синхронизация выше сначала подтягивает свежие исходящие из amojo,
+  // поэтому правило действует и для ответов из amoCRM, и из WhatsApp.
+  const { data: operatorRows } = await supabase
+    .from('amocrm_messages')
+    .select('id')
+    .eq('chat_id', input.chatId)
+    .eq('sender', 'operator')
+    .limit(1)
+  if (operatorRows?.length) return
+
   // Этапы двигаются ВСЕГДА по намерению клиента — даже когда бот выключен:
   // выключатель глушит только ответы, а не трекинг воронки.
   const inboundAction = COMPLAINT.test(input.text) || COOPERATION.test(input.text)
@@ -355,7 +370,12 @@ async function processInboundAmoMessageNow(input: InboundAmoMessage, alreadyStor
     stageAction = 'order'
   } else if (deliveryTemplate && (historyText.includes('цена') || historyText.includes('сом'))) {
     // Клиент назвал город после цены — готовый сценарий: доставка, эффект, CTA.
-    replies.push(deliveryTemplate, FIRST_USE_EFFECT, 'Оформить вам? Пока есть в наличии.')
+    replies.push(deliveryTemplate, FIRST_USE_EFFECT)
+    replies.push(
+      historyText.includes('скидк')
+        ? 'Оформить вам? Пока есть в наличии.'
+        : LOW_STOCK_DISCOUNT_CTA
+    )
     voiceReplies.add(FIRST_USE_EFFECT)
   }
 
