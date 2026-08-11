@@ -60,11 +60,11 @@ async function transcribeAmoVoice(input: InboundAmoMessage): Promise<string | nu
 const PRODUCT_INFO =
   'Одна коробка — 1490 сом. В ней 14 полосок, хватает на 7 применений.'
 
-const PRODUCT_EFFECT = 'Эффект заметен уже после первого применения 😊'
+const PRODUCT_EFFECT = 'Гарантированно увидите эффект с первого раза.'
 
 const GREETING_MESSAGES = [
   'Здравствуйте! 😊',
-  'SmileKit помогает заметно отбелить зубы уже после первого применения.',
+  'Гарантированно увидите эффект с первого раза.',
   '📦 В наборе 14 отбеливающих полосок — это полный курс.\n\n💰 ЦЕНА — 1490 СОМ.🇰🇬',
 ] as const
 
