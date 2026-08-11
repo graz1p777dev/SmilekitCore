@@ -58,27 +58,24 @@ async function transcribeAmoVoice(input: InboundAmoMessage): Promise<string | nu
 // поэтому на этапе оплаты сделка передаётся менеджеру.
 
 const PRODUCT_INFO =
-  'Одна коробка — 1490 сом. В ней 14 полосок, хватает на 7 применений.'
-
-const PRODUCT_EFFECT = 'Гарантированно увидите эффект с первого раза.'
-
-const GREETING_MESSAGES = [
-  'Здравствуйте! 😊',
-  'Гарантированно увидите эффект с первого раза.',
-  '📦 В наборе 14 отбеливающих полосок — это полный курс.\n\n💰 ЦЕНА — 1490 СОМ.🇰🇬',
-] as const
+  'Здравствуйте! 😊\n\n' +
+  'SmileKit помогает заметно отбелить зубы уже после первого применения.\n\n' +
+  '📦 В наборе 14 отбеливающих полосок — это полный курс.\n\n' +
+  '💰 ЦЕНА — 1490 СОМ.🇰🇬'
 
 const KYRGYZ_PRODUCT_INFO =
   'Салам! 😊 Бир кутусу — 1490 сом. Ичинде 14 даана тилке бар, 7 жолу колдонууга жетет. ' +
-  'Таасири биринчи колдонуудан кийин эле байкалат.'
+  'Таасири биринчи колдонуудан кийин эле байкалат.\n\n' +
+  'Кайсы шаардан болосуз? Жеткирүү боюнча айтып берем.'
 
 const KYRGYZ_MARKERS =
   /баа|наркы|канча|кайсы|шаар|жеткир|тиш|агарт|колдон|куту|барбы|алам|керек|рахмат|болобу|кантип|эмне/i
 const KYRGYZ_PRICE_INTENT = /баа|наркы|канча\s*(?:сом|турат)/i
-const RUSSIAN_PRICE_INTENT = /сколько\s+стоит|какая\s+цена|цена\s*[?？]?/i
 const LINK_IN_MESSAGE = /(?:https?:\/\/|www\.)\S+/i
 const GREETING_ONLY = /^\s*(?:улыбка|здравствуйте|здравствуй|привет|добрый\s+(?:день|вечер|утро))[!,.?\s😊👋]*$/iu
 const WHATSAPP_WAITING_PLACEHOLDER = /ожидание сообщения.*проверьте свой телефон/i
+
+const CITY_QUESTION = 'Подскажите, пожалуйста, из какого вы города?'
 
 const FIRST_USE_EFFECT =
   'Гарантированно увидите эффект с первого раза 😁. После курса эффект будет постоянный✅😊'
@@ -411,16 +408,12 @@ async function processInboundAmoMessageNow(input: InboundAmoMessage, alreadyStor
 
   if (LINK_IN_MESSAGE.test(input.text) || GREETING_ONLY.test(input.text)) {
     // Рекламная ссылка и слово-триггер «Улыбка» не являются вопросом клиента:
-    // не обсуждаем ссылку и не запускаем продажный сценарий, только здороваемся.
-    replies.push(...GREETING_MESSAGES)
+    // не обсуждаем ссылку, а запускаем обычный старый сценарий знакомства.
+    replies.push(PRODUCT_INFO, CITY_QUESTION)
   } else if (isKyrgyz && KYRGYZ_PRICE_INTENT.test(languageContext)) {
     replies.push(KYRGYZ_PRODUCT_INFO)
-  } else if (RUSSIAN_PRICE_INTENT.test(input.text)) {
-    // Цена и эффект — отдельными пузырями; вопрос о городе здесь не нужен.
-    if (history.length === 0) replies.push(...GREETING_MESSAGES)
-    else replies.push(PRODUCT_INFO, PRODUCT_EFFECT)
   } else if (history.length === 0) {
-    replies.push(...GREETING_MESSAGES)
+    replies.push(PRODUCT_INFO, CITY_QUESTION)
   } else if (SCAM_DOUBT.test(input.text)) {
     replies.push(DOUBT_RESULT_REPLY)
     voiceReplies.add(DOUBT_RESULT_REPLY)
