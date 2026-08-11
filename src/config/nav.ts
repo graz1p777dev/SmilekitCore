@@ -33,6 +33,7 @@ import {
   Sparkles,
   Handshake,
   Package,
+  Send,
 } from 'lucide-react'
 
 export const NAV_GROUPS: NavGroup[] = [
@@ -61,6 +62,12 @@ export const NAV_GROUPS: NavGroup[] = [
         label: 'Заказы',
         icon: Package,
         roles: ['owner', 'rop', 'mp', 'lmai'],
+      },
+      {
+        href: '/dashboard/campaigns',
+        label: 'Рассылки',
+        icon: Send,
+        roles: ['owner', 'rop'],
       },
       {
         href: '/dashboard/copilot',

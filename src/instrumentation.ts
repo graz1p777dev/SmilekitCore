@@ -8,5 +8,7 @@ export async function register() {
     void replayRecentUnansweredAmoMessages().catch((error) =>
       console.error('amocrm unanswered replay failed', error)
     )
+    const { startCampaignScheduler } = await import('@/lib/campaigns/scheduler')
+    startCampaignScheduler()
   }
 }
