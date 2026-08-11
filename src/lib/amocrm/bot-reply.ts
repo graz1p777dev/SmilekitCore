@@ -183,9 +183,9 @@ export async function registerOutgoingAmoMessage(input: InboundAmoMessage): Prom
 // цепочки достаточно.
 const chatQueues = new Map<string, Promise<void>>()
 
-export function processInboundAmoMessage(input: InboundAmoMessage): Promise<void> {
+function enqueueInboundAmoMessage(input: InboundAmoMessage, alreadyStored = false): Promise<void> {
   const prev = chatQueues.get(input.chatId) ?? Promise.resolve()
-  const run = prev.then(() => processInboundAmoMessageNow(input))
+  const run = prev.then(() => processInboundAmoMessageNow(input, alreadyStored))
   const chain = run.then(
     () => {},
     () => {}
@@ -197,42 +197,94 @@ export function processInboundAmoMessage(input: InboundAmoMessage): Promise<void
   return run
 }
 
+export function processInboundAmoMessage(input: InboundAmoMessage): Promise<void> {
+  return enqueueInboundAmoMessage(input)
+}
+
+/** Подбирает после рестарта недавние сообщения, оставшиеся без ответа. */
+export async function replayRecentUnansweredAmoMessages(minutes = 15): Promise<void> {
+  const supabase = createAdminClient()
+  const { data, error } = await supabase
+    .from('amocrm_messages')
+    .select('amo_message_id, chat_id, lead_id, contact_id, sender, author_name, text')
+    .gte('created_at', new Date(Date.now() - minutes * 60_000).toISOString())
+    .order('created_at', { ascending: true })
+    .order('id', { ascending: true })
+    .limit(500)
+  if (error) throw new Error(`recent unanswered lookup failed: ${error.message}`)
+
+  type RecentMessage = {
+    amo_message_id: string
+    chat_id: string
+    lead_id: string | null
+    contact_id: string | null
+    sender: string
+    author_name: string | null
+    text: string
+  }
+  const latestByChat = new Map<string, RecentMessage>()
+  for (const row of (data ?? []) as RecentMessage[]) latestByChat.set(row.chat_id, row)
+  const unanswered = [...latestByChat.values()].filter((row) => row.sender === 'client')
+  if (unanswered.length) {
+    console.log(`amocrm bot-reply: replaying ${unanswered.length} unanswered message(s)`)
+  }
+  await Promise.all(
+    unanswered.map((row) =>
+      enqueueInboundAmoMessage(
+        {
+          amoMessageId: row.amo_message_id,
+          chatId: row.chat_id,
+          leadId: row.lead_id,
+          contactId: row.contact_id,
+          authorName: row.author_name,
+          text: row.text,
+        },
+        true
+      )
+    )
+  )
+}
+
 /**
  * Полный цикл на входящее сообщение: сохранить → сделка → ответ ИИ →
  * отправить в amo → сохранить ответ → продвинуть этап.
  * Вызывается detached из вебхука (амо ждёт 200 быстро) — все сбои в console.
  */
-async function processInboundAmoMessageNow(input: InboundAmoMessage): Promise<void> {
+async function processInboundAmoMessageNow(input: InboundAmoMessage, alreadyStored: boolean): Promise<void> {
   const supabase = createAdminClient()
-  const transcript = await transcribeAmoVoice(input)
-  if (VOICE_TYPES.has(input.messageType ?? '') && !transcript) {
-    console.error('amocrm bot-reply: voice transcription failed', input.amoMessageId)
-    return
+  if (!alreadyStored) {
+    const transcript = await transcribeAmoVoice(input)
+    if (VOICE_TYPES.has(input.messageType ?? '') && !transcript) {
+      console.error('amocrm bot-reply: voice transcription failed', input.amoMessageId)
+      return
+    }
+    if (transcript) input = { ...input, text: transcript }
   }
-  if (transcript) input = { ...input, text: transcript }
 
   // Идемпотентность: ретрай вебхука с тем же amo_message_id не отвечает дважды.
-  const { data: inserted, error: insertError } = await supabase
-    .from('amocrm_messages')
-    .upsert(
-      {
-        amo_message_id: input.amoMessageId,
-        chat_id: input.chatId,
-        lead_id: input.leadId,
-        contact_id: input.contactId,
-        direction: 'in',
-        sender: 'client',
-        author_name: input.authorName,
-        text: input.text,
-      },
-      { onConflict: 'amo_message_id', ignoreDuplicates: true }
-    )
-    .select('id')
-  if (insertError) {
-    console.error('amocrm bot-reply: insert failed', insertError.message)
-    return
+  if (!alreadyStored) {
+    const { data: inserted, error: insertError } = await supabase
+      .from('amocrm_messages')
+      .upsert(
+        {
+          amo_message_id: input.amoMessageId,
+          chat_id: input.chatId,
+          lead_id: input.leadId,
+          contact_id: input.contactId,
+          direction: 'in',
+          sender: 'client',
+          author_name: input.authorName,
+          text: input.text,
+        },
+        { onConflict: 'amo_message_id', ignoreDuplicates: true }
+      )
+      .select('id')
+    if (insertError) {
+      console.error('amocrm bot-reply: insert failed', insertError.message)
+      return
+    }
+    if (!inserted?.length) return // дубль — уже обработано
   }
-  if (!inserted?.length) return // дубль — уже обработано
 
   const externalKey = input.leadId ? `amocrm:${input.leadId}` : `amocrm-chat:${input.chatId}`
   // Аварийный выключатель: integrations.amoCRM.is_active. Выключен — историю
