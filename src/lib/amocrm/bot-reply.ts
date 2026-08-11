@@ -62,8 +62,11 @@ const PRODUCT_INFO =
 
 const PRODUCT_EFFECT = 'Эффект заметен уже после первого применения 😊'
 
-const GREETING =
-  'Здравствуйте! 😊 Чем могу помочь? Подскажу по нашим отбеливающим полоскам или оформлению заказа.'
+const GREETING_MESSAGES = [
+  'Здравствуйте! 😊',
+  'SmileKit помогает заметно отбелить зубы уже после первого применения.',
+  '📦 В наборе 14 отбеливающих полосок — это полный курс.\n\n💰 ЦЕНА — 1490 СОМ.🇰🇬',
+] as const
 
 const KYRGYZ_PRODUCT_INFO =
   'Салам! 😊 Бир кутусу — 1490 сом. Ичинде 14 даана тилке бар, 7 жолу колдонууга жетет. ' +
@@ -409,14 +412,15 @@ async function processInboundAmoMessageNow(input: InboundAmoMessage, alreadyStor
   if (LINK_IN_MESSAGE.test(input.text) || GREETING_ONLY.test(input.text)) {
     // Рекламная ссылка и слово-триггер «Улыбка» не являются вопросом клиента:
     // не обсуждаем ссылку и не запускаем продажный сценарий, только здороваемся.
-    replies.push(GREETING)
+    replies.push(...GREETING_MESSAGES)
   } else if (isKyrgyz && KYRGYZ_PRICE_INTENT.test(languageContext)) {
     replies.push(KYRGYZ_PRODUCT_INFO)
   } else if (RUSSIAN_PRICE_INTENT.test(input.text)) {
     // Цена и эффект — отдельными пузырями; вопрос о городе здесь не нужен.
-    replies.push(PRODUCT_INFO, PRODUCT_EFFECT)
+    if (history.length === 0) replies.push(...GREETING_MESSAGES)
+    else replies.push(PRODUCT_INFO, PRODUCT_EFFECT)
   } else if (history.length === 0) {
-    replies.push(GREETING)
+    replies.push(...GREETING_MESSAGES)
   } else if (SCAM_DOUBT.test(input.text)) {
     replies.push(DOUBT_RESULT_REPLY)
     voiceReplies.add(DOUBT_RESULT_REPLY)
