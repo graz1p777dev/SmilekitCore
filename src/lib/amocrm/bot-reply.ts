@@ -192,6 +192,28 @@ export async function registerOutgoingAmoMessage(input: InboundAmoMessage): Prom
 // цепочки достаточно.
 const chatQueues = new Map<string, Promise<void>>()
 
+async function canSendAmoBotReply(
+  supabase: ReturnType<typeof createAdminClient>,
+  chatId: string
+): Promise<boolean> {
+  const [integrationResult, operatorResult] = await Promise.all([
+    supabase
+      .from('integrations')
+      .select('is_active')
+      .eq('name', 'amoCRM')
+      .maybeSingle(),
+    supabase
+      .from('amocrm_messages')
+      .select('id')
+      .eq('chat_id', chatId)
+      .eq('sender', 'operator')
+      .limit(1),
+  ])
+  if (integrationResult.error || operatorResult.error) return false
+  return Boolean((integrationResult.data as { is_active?: boolean } | null)?.is_active)
+    && !operatorResult.data?.length
+}
+
 function enqueueInboundAmoMessage(input: InboundAmoMessage, alreadyStored = false): Promise<void> {
   const prev = chatQueues.get(input.chatId) ?? Promise.resolve()
   const run = prev.then(() => processInboundAmoMessageNow(input, alreadyStored))
@@ -428,6 +450,10 @@ async function processInboundAmoMessageNow(input: InboundAmoMessage, alreadyStor
   }
 
   for (let index = 0; index < replies.length; index++) {
+    // Генерация и паузы между сообщениями занимают время. За это время бот
+    // могли выключить или менеджер мог забрать чат — проверяем прямо перед
+    // каждой фактической отправкой, а не только в начале обработки.
+    if (!(await canSendAmoBotReply(supabase, input.chatId))) return
     const text = replies[index]
     const botMessageId = `bot:${input.amoMessageId}:${index}`
     // Записываем до отправки: исходящий webhook amoCRM может вернуться раньше,
@@ -474,6 +500,7 @@ async function processInboundAmoMessageNow(input: InboundAmoMessage, alreadyStor
       const mediaBaseUrl = process.env.SMILEKIT_BOT_API_URL?.replace(/\/$/, '')
       if (mediaBaseUrl) {
         for (const [name, caption] of [['before.jpg', 'До'], ['after.jpg', 'После']] as const) {
+          if (!(await canSendAmoBotReply(supabase, input.chatId))) return
           const photoMessageId = `bot:${input.amoMessageId}:result:${name}`
           const { error: photoReserveError } = await supabase.from('amocrm_messages').upsert({
             amo_message_id: photoMessageId,
