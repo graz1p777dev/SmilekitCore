@@ -119,6 +119,16 @@ function deliveryTemplateForCity(text: string): string | null {
   return null
 }
 
+function shouldSendResultsAfterLocation(text: string, historyText: string): boolean {
+  const normalized = text.trim().toLowerCase().replace(/\s+/g, ' ')
+  const priorPrice = historyText.includes('цена') || historyText.includes('сом')
+  if (!priorPrice || LINK_IN_MESSAGE.test(text) || GREETING_ONLY.test(text)) return false
+  const askedForCity = historyText.includes('из какого вы города') || historyText.includes('вы в бишкеке')
+  const shortLocationAnswer = !/[?？]/.test(text) && normalized.split(/\s+/).length <= 5
+  const deliveryQuestion = /достав|жеткир|отправ|привез/iu.test(text)
+  return deliveryQuestion || (askedForCity && shortLocationAnswer)
+}
+
 // sales.py: _ORDER_INTENT + _PAYMENT_INFO_REQUEST — клиент готов оформлять
 // или спрашивает, как платить.
 const ORDER_INTENT =
@@ -392,7 +402,7 @@ async function processInboundAmoMessageNow(input: InboundAmoMessage, alreadyStor
   // Скриптовые ветки — как в Telegram-обработчике (__main__.py), без ИИ.
   const replies: string[] = []
   const voiceReplies = new Set<string>()
-  let sendResultPhotos = false
+  let sendResultPhotos = shouldSendResultsAfterLocation(input.text, historyText)
   let stageAction: string | null = null
   const deliveryTemplate = deliveryTemplateForCity(input.text)
 
