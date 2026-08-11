@@ -58,22 +58,24 @@ async function transcribeAmoVoice(input: InboundAmoMessage): Promise<string | nu
 // поэтому на этапе оплаты сделка передаётся менеджеру.
 
 const PRODUCT_INFO =
-  'Здравствуйте! 😊\n\n' +
-  'SmileKit помогает заметно отбелить зубы уже после первого применения.\n\n' +
-  '📦 В наборе 14 отбеливающих полосок — это полный курс.\n\n' +
-  '💰 ЦЕНА — 1490 СОМ.🇰🇬'
+  'Одна коробка — 1490 сом. В ней 14 полосок, хватает на 7 применений.'
+
+const PRODUCT_EFFECT = 'Эффект заметен уже после первого применения 😊'
+
+const GREETING =
+  'Здравствуйте! 😊 Чем могу помочь? Подскажу по нашим отбеливающим полоскам или оформлению заказа.'
 
 const KYRGYZ_PRODUCT_INFO =
   'Салам! 😊 Бир кутусу — 1490 сом. Ичинде 14 даана тилке бар, 7 жолу колдонууга жетет. ' +
-  'Таасири биринчи колдонуудан кийин эле байкалат.\n\n' +
-  'Кайсы шаардан болосуз? Жеткирүү боюнча айтып берем.'
+  'Таасири биринчи колдонуудан кийин эле байкалат.'
 
 const KYRGYZ_MARKERS =
   /баа|наркы|канча|кайсы|шаар|жеткир|тиш|агарт|колдон|куту|барбы|алам|керек|рахмат|болобу|кантип|эмне/i
 const KYRGYZ_PRICE_INTENT = /баа|наркы|канча\s*(?:сом|турат)/i
+const RUSSIAN_PRICE_INTENT = /сколько\s+стоит|какая\s+цена|цена\s*[?？]?/i
+const LINK_IN_MESSAGE = /(?:https?:\/\/|www\.)\S+/i
+const GREETING_ONLY = /^\s*(?:улыбка|здравствуйте|здравствуй|привет|добрый\s+(?:день|вечер|утро))[!,.?\s😊👋]*$/iu
 const WHATSAPP_WAITING_PLACEHOLDER = /ожидание сообщения.*проверьте свой телефон/i
-
-const CITY_QUESTION = 'Подскажите, пожалуйста, из какого вы города?'
 
 const FIRST_USE_EFFECT =
   'Гарантированно увидите эффект с первого раза 😁. После курса эффект будет постоянный✅😊'
@@ -97,7 +99,7 @@ const COOPERATION_REPLY =
 const DELIVERY_TEMPLATES: [RegExp, string][] = [
   [/бишкек|токмок/, 'Отлично, у нас есть доставка через Яндекс, за 30 минут доставим'],
   [
-    /\bош\b|джалал-?абад|каракол|нарын|талас|баткен|балыкч/,
+    /\bош\b|джалал-?абад|каракол|нарын|талас|баткен|балыкч|манас/,
     'Да, у нас есть доставка через Ылдам Экспресс 🚚✅. Если оформить сейчас, доставка будет уже завтра или послезавтра',
   ],
   [/алмат/, 'Да, доставим! В Алматы — ориентировочно в течение 30 минут'],
@@ -373,6 +375,7 @@ async function processInboundAmoMessageNow(input: InboundAmoMessage, alreadyStor
   const history = (rows ?? [])
     .reverse()
     .slice(0, -1) // текущее сообщение уходит отдельным параметром message
+    .filter((row) => !LINK_IN_MESSAGE.test((row as { text: string }).text))
     .map((row) => ({
       role: (row as { sender: string }).sender === 'client' ? 'user' : 'assistant',
       content: (row as { text: string }).text,
@@ -393,11 +396,17 @@ async function processInboundAmoMessageNow(input: InboundAmoMessage, alreadyStor
   let stageAction: string | null = null
   const deliveryTemplate = deliveryTemplateForCity(input.text)
 
-  if (isKyrgyz && KYRGYZ_PRICE_INTENT.test(languageContext)) {
+  if (LINK_IN_MESSAGE.test(input.text) || GREETING_ONLY.test(input.text)) {
+    // Рекламная ссылка и слово-триггер «Улыбка» не являются вопросом клиента:
+    // не обсуждаем ссылку и не запускаем продажный сценарий, только здороваемся.
+    replies.push(GREETING)
+  } else if (isKyrgyz && KYRGYZ_PRICE_INTENT.test(languageContext)) {
     replies.push(KYRGYZ_PRODUCT_INFO)
+  } else if (RUSSIAN_PRICE_INTENT.test(input.text)) {
+    // Цена и эффект — отдельными пузырями; вопрос о городе здесь не нужен.
+    replies.push(PRODUCT_INFO, PRODUCT_EFFECT)
   } else if (history.length === 0) {
-    // Первый контакт — дословный скрипт: цена + вопрос о городе.
-    replies.push(`${PRODUCT_INFO}\n\n${CITY_QUESTION}`)
+    replies.push(GREETING)
   } else if (SCAM_DOUBT.test(input.text)) {
     replies.push(DOUBT_RESULT_REPLY)
     voiceReplies.add(DOUBT_RESULT_REPLY)
