@@ -52,10 +52,6 @@ async function transcribeAmoVoice(input: InboundAmoMessage): Promise<string | nu
   return result.ok ? result.data.transcript.trim() || null : null
 }
 
-function normalizedPhone(value: string | null): string {
-  return (value ?? '').replace(/\D/g, '')
-}
-
 // ─── Скрипт продаж — порт из Telegram-бота (smilekit_bot/templates.py,
 // sales.py, __main__.py). Тексты дословно по ТЗ, держим синхронно с ботом.
 // Отличие канала: QR-картинку и фото в WhatsApp через amojo не передать,
@@ -147,9 +143,8 @@ function stageActionForInbound(text: string): string | null {
 
 /**
  * Исходящее сообщение из вебхука. Если это НЕ эхо только что отправленного
- * ботом текста — в чат вступил живой менеджер (из амо или WhatsApp Business):
- * сохраняем как operator, и бот этот чат больше не трогает вообще
- * (см. проверку в processInboundAmoMessageNow).
+ * ботом текста — в чат вступил живой менеджер (из амо или WhatsApp Business).
+ * Сохраняем как operator, чтобы ответ был виден в общей истории диалога.
  */
 export async function registerOutgoingAmoMessage(input: InboundAmoMessage): Promise<void> {
   const supabase = createAdminClient()
@@ -295,11 +290,6 @@ async function processInboundAmoMessageNow(input: InboundAmoMessage, alreadyStor
     .eq('name', 'amoCRM')
     .maybeSingle()
   const botEnabled = Boolean((integration as { is_active?: boolean } | null)?.is_active)
-  const testPhone = normalizedPhone(process.env.AMOCRM_TEST_PHONE ?? null)
-  const testerEnabled = Boolean(testPhone && testPhone === normalizedPhone(input.customerPhone ?? null))
-  // Пока задан тестовый номер, это строгий allowlist: глобальный выключатель
-  // amoCRM не может случайно включить ответы всем остальным клиентам.
-  const replyAllowed = testPhone ? testerEnabled : botEnabled
   await upsertDealFromInbound({
     externalKey,
     source: 'amocrm',
@@ -311,19 +301,6 @@ async function processInboundAmoMessageNow(input: InboundAmoMessage, alreadyStor
   } catch (error) {
     console.error('amocrm bot-reply: history sync failed', error)
   }
-  // В чате уже писал живой менеджер — бот его не трогает вообще: ни ответов,
-  // ни этапов. Диалог целиком ведёт человек.
-  const { data: operatorRows } = await supabase
-    .from('amocrm_messages')
-    .select('id')
-    .eq('chat_id', input.chatId)
-    .eq('sender', 'operator')
-    .limit(1)
-  // В production менеджер навсегда останавливает автответы в этом чате.
-  // Единственное исключение — явно заданный тестовый номер: так проверяем
-  // интеграцию на владельце, не включая бота остальным клиентам.
-  if (operatorRows?.length && !testerEnabled) return
-
   // Этапы двигаются ВСЕГДА по намерению клиента — даже когда бот выключен:
   // выключатель глушит только ответы, а не трекинг воронки.
   const inboundAction = COMPLAINT.test(input.text) || COOPERATION.test(input.text)
@@ -336,7 +313,7 @@ async function processInboundAmoMessageNow(input: InboundAmoMessage, alreadyStor
     }
   }
 
-  if (!replyAllowed) return
+  if (!botEnabled) return
 
   // История чата: всё до текущего сообщения, старые → новые.
   const { data: rows } = await supabase
