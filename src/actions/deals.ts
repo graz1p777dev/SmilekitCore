@@ -367,7 +367,29 @@ export interface DealConversation {
  * Читаемая расшифровка диалога: для сделок с витрины — её диалог,
  * для сделок Wazzup — whatsapp_messages. Только чтение.
  */
+// Живой прод под сильной нагрузкой (шквал вебхуков amoCRM без общего лимита
+// параллелизма) может замедлить даже простое чтение уже сохранённых
+// сообщений — обычные прямые запросы к базе при этом остаются быстрыми,
+// то есть тормозит именно нагрузка на сервер CRM, а не сам Supabase/amoCRM.
+// Раньше таймаут стоял только вокруг синхронизации amojo — открытие
+// сделки с уже сохранённой историей никак не было защищено и могло
+// зависать на неопределённое время, упираясь в жёсткий клиентский
+// тайм-аут (12с, DealModal.tsx) без осмысленного сообщения. Жёсткий
+// потолок на всю функцию гарантирует быстрый и понятный ответ всегда.
 export async function getDealConversation(dealId: string): Promise<DealConversation> {
+  const timedOut = Symbol('timeout')
+  const result = await Promise.race([
+    loadDealConversation(dealId),
+    new Promise<typeof timedOut>((resolve) => setTimeout(() => resolve(timedOut), 9_000)),
+  ])
+  if (result !== timedOut) return result
+  return {
+    messages: [],
+    note: 'Сервер сейчас перегружен — попробуйте открыть сделку ещё раз через несколько секунд.',
+  }
+}
+
+async function loadDealConversation(dealId: string): Promise<DealConversation> {
   const me = await getViewer()
   if (!me) return { messages: [], note: 'Нет авторизации' }
 
