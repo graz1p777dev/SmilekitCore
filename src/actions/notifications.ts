@@ -38,7 +38,7 @@ export async function getNotifications(filter: 'all' | 'important' = 'all'): Pro
     .from('amocrm_messages')
     .select('id, chat_id, lead_id, contact_id, sender, author_name, text, created_at')
     .order('created_at', { ascending: false })
-    .limit(500)
+    .limit(200)
 
   const clientByChat = new Map<string, string>()
   for (const message of messages ?? []) {
