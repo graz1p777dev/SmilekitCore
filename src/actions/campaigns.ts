@@ -99,13 +99,17 @@ async function eligibleRecipients(): Promise<Recipient[]> {
         contact_id: null,
       }] : []
     }
-    if ((deal.source === 'whatsapp' || deal.source === 'instagram') && key.startsWith('amocrm:')) {
+    if (deal.source === 'amocrm' && key.startsWith('amocrm:')) {
+      // Сделки amoCRM — это WhatsApp-канал (см. upsertDealFromInbound в
+      // bot-reply.ts, source всегда 'amocrm', отдельного 'instagram' пока
+      // нет). 'whatsapp' — реальный канал отправки, CHECK на channel того
+      // же campaign_recipients требует конкретное значение, не 'amocrm'.
       const leadId = key.slice('amocrm:'.length)
       const chat = amoByLead.get(leadId)
       if (!chat || managerChats.has(chat.chatId)) return []
       return [{
         deal_id: id,
-        channel: deal.source,
+        channel: 'whatsapp',
         external_key: key,
         chat_id: chat.chatId,
         lead_id: leadId,
