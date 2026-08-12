@@ -2,9 +2,16 @@
 
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { CalendarClock, CheckCircle2, Clock3, Send, ShieldCheck, UsersRound, XCircle } from 'lucide-react'
+import { CalendarClock, CheckCircle2, Clock3, Send, ShieldCheck, ShieldX, Trash2, UsersRound, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
-import { cancelCampaign, scheduleCampaign, type CampaignsData, type CampaignRow } from '@/actions/campaigns'
+import {
+  addOptOutPhone,
+  cancelCampaign,
+  removeOptOutPhone,
+  scheduleCampaign,
+  type CampaignsData,
+  type CampaignRow,
+} from '@/actions/campaigns'
 import PageHeader from '@/components/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -38,6 +45,8 @@ export default function CampaignsClient({ initialData }: { initialData: Campaign
   const [title, setTitle] = useState('')
   const [message, setMessage] = useState('')
   const [scheduledAt, setScheduledAt] = useState(defaultSchedule)
+  const [optOutPhone, setOptOutPhone] = useState('')
+  const [optOutReason, setOptOutReason] = useState('')
 
   useEffect(() => {
     const timer = setInterval(() => router.refresh(), 15_000)
@@ -72,6 +81,34 @@ export default function CampaignsClient({ initialData }: { initialData: Campaign
         return
       }
       toast.success('Рассылка отменена')
+      router.refresh()
+    })
+  }
+
+  function addOptOut() {
+    const phone = optOutPhone.trim()
+    if (!phone) return
+    startTransition(async () => {
+      const result = await addOptOutPhone(phone, optOutReason)
+      if (!result.success) {
+        toast.error(result.error)
+        return
+      }
+      toast.success('Номер добавлен в стоп-список рассылок')
+      setOptOutPhone('')
+      setOptOutReason('')
+      router.refresh()
+    })
+  }
+
+  function removeOptOut(phone: string) {
+    startTransition(async () => {
+      const result = await removeOptOutPhone(phone)
+      if (!result.success) {
+        toast.error(result.error)
+        return
+      }
+      toast.success('Номер убран из стоп-списка')
       router.refresh()
     })
   }
@@ -166,6 +203,55 @@ export default function CampaignsClient({ initialData }: { initialData: Campaign
                 </article>
               )
             })}
+          </div>
+        </section>
+
+        <section className="mt-8">
+          <div className="mb-3 flex items-center gap-2">
+            <ShieldX className="size-4" style={{ color: 'var(--ink-3)' }} />
+            <h2 className="text-base font-bold" style={{ color: 'var(--ink)' }}>Стоп-список рассылок</h2>
+          </div>
+          <p className="mb-3 text-sm" style={{ color: 'var(--ink-3)' }}>
+            Номера здесь никогда не попадут в аудиторию рассылки — даже если ещё не купили.
+          </p>
+          <div className="rounded-2xl bg-white p-5 ring-1 ring-black/5">
+            <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_auto]">
+              <Input
+                value={optOutPhone}
+                onChange={(event) => setOptOutPhone(event.target.value)}
+                placeholder="Номер телефона, 996…"
+              />
+              <Input
+                value={optOutReason}
+                onChange={(event) => setOptOutReason(event.target.value)}
+                placeholder="Причина (необязательно)"
+              />
+              <Button disabled={!optOutPhone.trim() || pending} onClick={addOptOut}>
+                <ShieldX /> Добавить
+              </Button>
+            </div>
+
+            <div className="mt-4 space-y-2">
+              {initialData.optOuts.length === 0 && (
+                <p className="py-4 text-center text-sm" style={{ color: 'var(--ink-3)' }}>Стоп-список пуст</p>
+              )}
+              {initialData.optOuts.map((row) => (
+                <div key={row.phone} className="flex items-center justify-between gap-3 rounded-xl px-3 py-2" style={{ background: 'var(--surface-2)' }}>
+                  <div className="min-w-0">
+                    <p className="font-semibold tabular-nums" style={{ color: 'var(--ink)' }}>+{row.phone}</p>
+                    {row.reason && <p className="truncate text-xs" style={{ color: 'var(--ink-3)' }}>{row.reason}</p>}
+                  </div>
+                  <button
+                    type="button"
+                    disabled={pending}
+                    onClick={() => removeOptOut(row.phone)}
+                    className="flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50"
+                  >
+                    <Trash2 className="size-3.5" /> Убрать
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
         </section>
       </main>

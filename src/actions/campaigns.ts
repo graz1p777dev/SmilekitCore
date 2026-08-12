@@ -20,6 +20,7 @@ export interface CampaignRow {
 export interface CampaignsData {
   campaigns: CampaignRow[]
   eligibleCount: number
+  optOuts: OptOutRow[]
 }
 
 type Recipient = {
@@ -44,12 +45,17 @@ async function viewer() {
   return data as { id: string; role: string } | null
 }
 
+/** Только цифры — так же нормализован campaign_opt_outs.phone и телефон в чеке. */
+function normalizePhone(value: string | null | undefined): string {
+  return String(value || '').replace(/\D/g, '')
+}
+
 async function eligibleRecipients(): Promise<Recipient[]> {
   const admin = createAdminClient()
-  const [{ data: deals }, { data: orders }, { data: amoMessages }] = await Promise.all([
+  const [{ data: deals }, { data: orders }, { data: amoMessages }, { data: optOuts }] = await Promise.all([
     admin
       .from('deals')
-      .select('id, source, external_key')
+      .select('id, source, external_key, customer_phone')
       .neq('status', 'won')
       .is('deleted_at', null),
     admin
@@ -61,8 +67,10 @@ async function eligibleRecipients(): Promise<Recipient[]> {
       .from('amocrm_messages')
       .select('id, chat_id, lead_id, contact_id, sender')
       .order('id', { ascending: false }),
+    admin.from('campaign_opt_outs').select('phone'),
   ])
   const purchased = new Set((orders ?? []).flatMap((row) => row.deal_id ? [String(row.deal_id)] : []))
+  const excludedPhones = new Set((optOuts ?? []).map((row) => row.phone as string))
   const managerChats = new Set(
     (amoMessages ?? []).filter((row) => row.sender === 'operator').map((row) => String(row.chat_id))
   )
@@ -79,6 +87,7 @@ async function eligibleRecipients(): Promise<Recipient[]> {
     const id = String(deal.id)
     const key = String(deal.external_key || '')
     if (!key || purchased.has(id)) return []
+    if (excludedPhones.has(normalizePhone(deal.customer_phone))) return []
     if (deal.source === 'telegram' && key.startsWith('telegram:')) {
       const chatId = key.slice('telegram:'.length)
       return /^-?\d+$/.test(chatId) ? [{
@@ -109,13 +118,14 @@ async function eligibleRecipients(): Promise<Recipient[]> {
 
 export async function getCampaignsData(): Promise<CampaignsData> {
   const me = await viewer()
-  if (!me || !['owner', 'rop'].includes(me.role)) return { campaigns: [], eligibleCount: 0 }
+  if (!me || !['owner', 'rop'].includes(me.role)) return { campaigns: [], eligibleCount: 0, optOuts: [] }
   const admin = createAdminClient()
-  const [{ data }, recipients] = await Promise.all([
+  const [{ data }, recipients, optOuts] = await Promise.all([
     admin.from('campaigns').select('*').order('created_at', { ascending: false }).limit(50),
     eligibleRecipients(),
+    getOptOutPhones(),
   ])
-  return { campaigns: (data ?? []) as CampaignRow[], eligibleCount: recipients.length }
+  return { campaigns: (data ?? []) as CampaignRow[], eligibleCount: recipients.length, optOuts }
 }
 
 const CampaignSchema = z.object({
@@ -152,6 +162,56 @@ export async function scheduleCampaign(input: unknown): Promise<{ success: true;
   }
   revalidatePath('/dashboard/campaigns')
   return { success: true, count: recipients.length }
+}
+
+// ─── Стоп-список рассылок ─────────────────────────────────────────────────
+// Номера здесь исключаются из аудитории всегда, независимо от того, купили
+// они или нет (см. excludedPhones в eligibleRecipients).
+
+export interface OptOutRow {
+  phone: string
+  reason: string | null
+  created_at: string
+}
+
+export async function getOptOutPhones(): Promise<OptOutRow[]> {
+  const me = await viewer()
+  if (!me || !['owner', 'rop'].includes(me.role)) return []
+  const admin = createAdminClient()
+  const { data } = await admin
+    .from('campaign_opt_outs')
+    .select('phone, reason, created_at')
+    .order('created_at', { ascending: false })
+  return (data ?? []) as OptOutRow[]
+}
+
+export async function addOptOutPhone(
+  rawPhone: string,
+  reason: string
+): Promise<{ success: true } | { success: false; error: string }> {
+  const me = await viewer()
+  if (!me || !['owner', 'rop'].includes(me.role)) return { success: false, error: 'Нет доступа' }
+  const phone = rawPhone.replace(/\D/g, '')
+  if (phone.length < 5 || phone.length > 20) return { success: false, error: 'Некорректный номер телефона' }
+  const admin = createAdminClient()
+  const { error } = await admin.from('campaign_opt_outs').upsert({
+    phone,
+    reason: reason.trim().slice(0, 300) || null,
+    created_by: me.id,
+  })
+  if (error) return { success: false, error: error.message }
+  revalidatePath('/dashboard/campaigns')
+  return { success: true }
+}
+
+export async function removeOptOutPhone(phone: string): Promise<{ success: boolean; error?: string }> {
+  const me = await viewer()
+  if (!me || !['owner', 'rop'].includes(me.role)) return { success: false, error: 'Нет доступа' }
+  const admin = createAdminClient()
+  const { error } = await admin.from('campaign_opt_outs').delete().eq('phone', phone)
+  if (error) return { success: false, error: error.message }
+  revalidatePath('/dashboard/campaigns')
+  return { success: true }
 }
 
 export async function cancelCampaign(id: string): Promise<{ success: boolean; error?: string }> {
