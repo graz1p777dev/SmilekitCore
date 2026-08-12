@@ -50,23 +50,47 @@ function normalizePhone(value: string | null | undefined): string {
   return String(value || '').replace(/\D/g, '')
 }
 
+/**
+ * Supabase (PostgREST) молча обрезает любую выборку до 1000 строк — сервер
+ * игнорирует .limit() больше этого потолка (project max-rows), проверено
+ * напрямую: .limit(100000) всё равно вернул ровно 1000. С 6750+ строками в
+ * amocrm_messages и почти 1000 сделками это тихо теряло данные —
+ * eligibleRecipients() почти всех клиентов отсеивал как «нет данных».
+ * Обходим постраничным чтением через .range().
+ */
+async function fetchAllRows<T>(
+  admin: ReturnType<typeof createAdminClient>,
+  table: string,
+  select: string,
+  apply: (query: any) => any
+): Promise<T[]> {
+  const PAGE_SIZE = 1000
+  const rows: T[] = []
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await apply(admin.from(table).select(select)).range(from, from + PAGE_SIZE - 1)
+    if (error) throw new Error(`${table}: ${error.message}`)
+    rows.push(...((data ?? []) as T[]))
+    if (!data || data.length < PAGE_SIZE) break
+  }
+  return rows
+}
+
 async function eligibleRecipients(): Promise<Recipient[]> {
   const admin = createAdminClient()
-  const [{ data: deals }, { data: orders }, { data: amoMessages }, { data: optOuts }] = await Promise.all([
-    admin
-      .from('deals')
-      .select('id, source, external_key, customer_phone')
-      .neq('status', 'won')
-      .is('deleted_at', null),
+  const [deals, { data: orders }, amoMessages, { data: optOuts }] = await Promise.all([
+    fetchAllRows<{ id: string; source: string; external_key: string | null; customer_phone: string | null }>(
+      admin, 'deals', 'id, source, external_key, customer_phone',
+      (q) => q.neq('status', 'won').is('deleted_at', null).order('id')
+    ),
     admin
       .from('orders')
       .select('deal_id')
       .neq('status', 'cancelled')
       .is('deleted_at', null),
-    admin
-      .from('amocrm_messages')
-      .select('id, chat_id, lead_id, contact_id, sender')
-      .order('id', { ascending: false }),
+    fetchAllRows<{ id: number; chat_id: string; lead_id: string | null; contact_id: string | null; sender: string }>(
+      admin, 'amocrm_messages', 'id, chat_id, lead_id, contact_id, sender',
+      (q) => q.order('id', { ascending: false })
+    ),
     admin.from('campaign_opt_outs').select('phone'),
   ])
   const purchased = new Set((orders ?? []).flatMap((row) => row.deal_id ? [String(row.deal_id)] : []))
