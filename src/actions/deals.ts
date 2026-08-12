@@ -396,7 +396,12 @@ export async function getDealConversation(dealId: string): Promise<DealConversat
     // Переписка WhatsApp-канала amoCRM живёт у нас (amocrm_messages,
     // миграция 041) — сервер мастер истории, см. src/lib/amocrm/bot-reply.ts.
     const leadId = deal.external_key.slice('amocrm:'.length)
-    const readStoredMessages = () => supabase
+    // Системная история amoCRM не принадлежит конкретному сотруднику.
+    // Авторизация уже проверена выше, поэтому читаем её admin-клиентом:
+    // пользовательский RLS-клиент возвращал пусто и запускал медленную
+    // синхронизацию amojo при каждом открытии сделки.
+    const admin = createAdminClient()
+    const readStoredMessages = () => admin
       .from('amocrm_messages')
       .select('id, direction, sender, text, created_at')
       .eq('lead_id', leadId)
@@ -407,7 +412,6 @@ export async function getDealConversation(dealId: string): Promise<DealConversat
     // Вебхук уже поддерживает живую историю. amojo нужен только для старого
     // диалога, которого ещё нет локально — не задерживаем им обычное открытие.
     if (!rows?.length) {
-      const admin = createAdminClient()
       const { data: chatRow } = await admin
         .from('amocrm_messages')
         .select('chat_id')

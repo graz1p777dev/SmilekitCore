@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import type { Notification } from '@/types'
 
 export type ActionResult = { success: true } | { success: false; error: string }
@@ -28,7 +29,44 @@ export async function getNotifications(filter: 'all' | 'important' = 'all'): Pro
   }
 
   const { data } = await query
-  return (data ?? []) as Notification[]
+  const notifications = (data ?? []) as Notification[]
+
+  if (filter === 'important') return notifications
+
+  const admin = createAdminClient()
+  const { data: messages } = await admin
+    .from('amocrm_messages')
+    .select('id, chat_id, lead_id, contact_id, sender, author_name, text, created_at')
+    .order('created_at', { ascending: false })
+    .limit(500)
+
+  const clientByChat = new Map<string, string>()
+  for (const message of messages ?? []) {
+    if (message.sender === 'client' && message.author_name && !clientByChat.has(message.chat_id)) {
+      clientByChat.set(message.chat_id, message.author_name)
+    }
+  }
+
+  const botReplies: Notification[] = (messages ?? [])
+    .filter(message => message.sender === 'bot')
+    .slice(0, 100)
+    .map(message => ({
+      id: `bot-reply-${message.id}`,
+      employee_id: session.user.id,
+      type: 'bot_reply',
+      title: `Ответ бота → ${clientByChat.get(message.chat_id) ?? `лид ${message.lead_id ?? 'amoCRM'}`}`,
+      body: message.text,
+      action_url: null,
+      is_read: true,
+      is_important: false,
+      source_type: 'amocrm_bot_reply',
+      source_id: message.contact_id,
+      created_at: message.created_at,
+    }))
+
+  return [...notifications, ...botReplies]
+    .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))
+    .slice(0, 100)
 }
 
 export async function markNotificationRead(id: string): Promise<ActionResult> {

@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { Bell, Check, CheckCheck } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useAuth } from '@/contexts/AuthContext'
-import { markAllNotificationsRead, markNotificationRead } from '@/actions/notifications'
+import { getNotifications, markAllNotificationsRead, markNotificationRead } from '@/actions/notifications'
 import { NOTIFICATION_TYPE_MAP } from '@/lib/constants'
 import type { Notification } from '@/types'
 
@@ -43,6 +43,14 @@ export default function NotificationsList({
       .subscribe()
     return () => { supabase.removeChannel(channel) }
   }, [user?.id, supabase])
+
+  useEffect(() => {
+    if (initialFilter !== 'all') return
+    const timer = window.setInterval(() => {
+      void getNotifications('all').then(setItems)
+    }, 10_000)
+    return () => window.clearInterval(timer)
+  }, [initialFilter])
 
   const unreadCount = items.filter(n => !n.is_read).length
 

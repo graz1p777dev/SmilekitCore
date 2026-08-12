@@ -55,6 +55,7 @@ export const NOTIFICATION_TYPE_MAP: Record<
   deploy:                   { label: 'Деплой',               icon: '🚀', color: '#5115a4', bg: '#f1ebfa' },
   security:                 { label: 'Безопасность',         icon: '🔒', color: '#5115a4', bg: '#fee2e2' },
   audit:                    { label: 'Изменение записи',     icon: '✏️', color: '#6b7280', bg: '#fdfbfb' },
+  bot_reply:                { label: 'Ответ бота',           icon: '🤖', color: '#5115a4', bg: '#f1ebfa' },
   kpi_alert:                { label: 'KPI',                  icon: '📉', color: '#5115a4', bg: '#fee2e2' },
   kpi_success:              { label: 'KPI',                  icon: '📈', color: '#166534', bg: '#dcfce7' },
   plan_100:                 { label: 'План выполнен',        icon: '🎯', color: '#166534', bg: '#dcfce7' },
