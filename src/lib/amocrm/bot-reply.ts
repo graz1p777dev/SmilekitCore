@@ -65,7 +65,7 @@ const PRODUCT_INFO =
   '💰 ЦЕНА — 1490 СОМ.🇰🇬'
 
 const KYRGYZ_PRODUCT_INFO =
-  'Салам! 😊 Бир кутусу — 1490 сом. Ичинде 14 даана тилке бар, 7 жолу колдонууга жетет. ' +
+  'Салам! 😊 Бир кутусу — 1490 сом. Ичинде 14 даана тилке бар — бул толук курс. ' +
   'Таасири биринчи колдонуудан кийин эле байкалат.\n\n' +
   'Кайсы шаардан болосуз? Жеткирүү боюнча айтып берем.'
 
@@ -85,12 +85,26 @@ const LOW_STOCK_DISCOUNT_CTA =
   'Кстати, у нас осталось буквально 2 упаковки, поэтому мы их отдаем по скидке 10% ☺️\n' +
   'Оформить вам доставку ?)'
 
+// templates.py: PAYMENT_QR_MESSAGE — дословно. QR-картинку и приём/проверку
+// чека для WhatsApp ещё предстоит реализовать (см. ПЕРЕДАЧА-CODEX), поэтому
+// пока после чек-листа сделка передаётся менеджеру — временная мера, а не
+// то же поведение, что в Telegram.
 const ORDER_CHECKLIST =
   'Чтобы оформить заказ, пожалуйста, отправьте 😊\n\n' +
+  '• чек об оплате;\n\n' +
   '• адрес доставки;\n\n' +
-  '• ваше имя;\n\n' +
-  '• номер телефона.\n\n' +
-  'Менеджер свяжется с вами для оплаты и подтверждения заказа.'
+  '• номер телефона.'
+
+const RETURNING_GREETING_REPLIES = [
+  'Здравствуйте! 😊 Рада снова вас видеть. Чем могу помочь?',
+  'Здравствуйте! 😊 Конечно, я на связи. Что подсказать?',
+  'Здравствуйте! 😊 Продолжим — чем могу помочь?',
+]
+
+const RETURNING_KYRGYZ_GREETING_REPLIES = [
+  'Салам! 😊 Кайрадан көргөнүмө кубанычтамын. Кантип жардам берейин?',
+  'Салам! 😊 Мен байланышта элем. Эмне боюнча жардам керек?',
+]
 
 const COMPLAINT_PROMPT = 'Подскажите, пожалуйста, что вас не устроило — для улучшения нашего сервиса.'
 
@@ -139,7 +153,7 @@ const ORDER_INTENT =
 // «у большинства». Срабатывает на сомнения в честности/реальности ДО покупки.
 const DOUBT_RESULT_REPLY =
   'Вы можете зайти в наш Instagram и посмотреть результаты других клиентов. ' +
-  'Гарантированно увидите эффект с первого раза.'
+  'Мы гарантируем эффект уже после первого применения.'
 
 // sales.py: _SCAM_DOUBT + формулировки из реальных диалогов WhatsApp
 // («это все реально да», «без обмана»). Проверяется раньше жалоб —
@@ -478,7 +492,15 @@ async function processInboundAmoMessageNow(input: InboundAmoMessage, alreadyStor
   let stageAction: string | null = null
   const deliveryTemplate = deliveryTemplateForCity(input.text)
 
-  if (LINK_IN_MESSAGE.test(input.text) || GREETING_ONLY.test(input.text)) {
+  if (history.length > 0 && GREETING_ONLY.test(input.text)) {
+    // Постоянный клиент поздоровался посреди диалога — не перезапускаем
+    // воронку заново (__main__.py: is_greeting_only для не-нового диалога).
+    replies.push(
+      isKyrgyz
+        ? RETURNING_KYRGYZ_GREETING_REPLIES[Math.floor(Math.random() * RETURNING_KYRGYZ_GREETING_REPLIES.length)]
+        : RETURNING_GREETING_REPLIES[Math.floor(Math.random() * RETURNING_GREETING_REPLIES.length)]
+    )
+  } else if (LINK_IN_MESSAGE.test(input.text) || GREETING_ONLY.test(input.text)) {
     // Рекламная ссылка и слово-триггер «Улыбка» не являются вопросом клиента:
     // не обсуждаем ссылку, а запускаем обычный старый сценарий знакомства.
     replies.push(PRODUCT_INFO, CITY_QUESTION)
