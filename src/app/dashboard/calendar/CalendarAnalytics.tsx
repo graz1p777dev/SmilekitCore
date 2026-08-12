@@ -118,7 +118,7 @@ export default function CalendarAnalytics({ month, days }: Props) {
           <aside className="p-5" style={{ background: '#ffffff', border: '1px solid #ece5e5', borderRadius: 24 }}>
             <div className="flex items-center gap-2"><CalendarDays size={18} color="#5115a4" /><p className="text-sm font-semibold" style={{ color: '#1b1517' }}>{new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long' }).format(new Date(`${selected.date}T12:00:00`))}</p></div>
             <p className="mt-4 text-lg font-semibold leading-snug" style={{ color: '#1b1517' }}>{insight(selected)}</p>
-            <div className="mt-6 grid grid-cols-2 gap-3">
+            <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
               {[
                 ['Выручка', `${money.format(selected.revenue)} сом`], ['Продажи', String(selected.sales)], ['ФВ', String(selected.fv)], ['Лиды', String(selected.leads)], ['Доходы', `${money.format(selected.income)} сом`], ['Расходы', `${money.format(selected.expense)} сом`],
               ].map(([label, value]) => <div key={label} className="p-3" style={{ background: '#faf8f7', border: '1px solid #f0eaea', borderRadius: 14 }}><p className="text-[11px]" style={{ color: '#6b6063' }}>{label}</p><p className="mt-1 text-sm font-semibold" style={{ color: '#1b1517' }}>{value}</p></div>)}

@@ -68,7 +68,7 @@ export default function MarketingCharts({ daily }: Props) {
     <div className="space-y-3">
 
       {/* Строка 1: Расход vs Выручка | Обращения vs Продажи */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
 
         {/* 1. Расход vs Выручка */}
         <GlassChartCard
@@ -139,7 +139,7 @@ export default function MarketingCharts({ daily }: Props) {
       </div>
 
       {/* Строка 2: CPL | ROMI | Накопительный план */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
 
         {/* 3. CPL по дням */}
         <GlassChartCard title="CPL по дням">

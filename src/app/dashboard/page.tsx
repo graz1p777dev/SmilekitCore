@@ -71,22 +71,22 @@ export default async function DashboardPage() {
   return (
     <div className="flex flex-col">
 
-      {/* ── Первый экран: ровно как был — две колонки на всю высоту, каждая
+      {/* ── Первый экран: на десктопе две колонки на всю высоту, каждая
              со своей прокруткой. Ниже него страница продолжается, поэтому
-             height (а не min-height) здесь обязателен: колонки должны
-             упереться в границу экрана, а не растянуться под весь документ. ── */}
-      <div className="flex flex-shrink-0" style={{ height: 'calc(100vh - 52px)' }}>
+             фиксированная height (а не min-height) обязательна: колонки
+             должны упереться в границу экрана, а не растянуться под весь
+             документ. На телефоне колонки складываются друг под друга и
+             высоту не фиксируем — иначе внутри узкого экрана появились бы
+             две независимые прокрутки вместо одной страницы. ── */}
+      <div className="flex flex-col md:h-[calc(100vh-52px)] md:flex-shrink-0 md:flex-row">
 
       {/* ── Левая панель: итоги месяца ── */}
       <div
-        className="flex flex-col overflow-y-auto glass"
+        className="flex w-full flex-col border-b border-[rgba(28,20,22,0.07)] glass md:w-[55%] md:overflow-y-auto md:border-b-0 md:border-r"
         style={{
           borderTop: 'none',
           borderLeft: 'none',
-          borderBottom: 'none',
-          borderRight: '1px solid rgba(28,20,22,0.07)',
           minWidth: 0,
-          width: '55%',
         }}
       >
         <div className="px-6 pt-6 pb-4 flex-shrink-0">
@@ -110,11 +110,8 @@ export default async function DashboardPage() {
 
       {/* ── Правая панель: сегодня ── */}
       <div
-        className="flex flex-col overflow-y-auto"
-        style={{
-          minWidth: 0,
-          width: '45%',
-        }}
+        className="flex w-full flex-col md:w-[45%] md:overflow-y-auto"
+        style={{ minWidth: 0 }}
       >
         <div className="px-6 pt-6 pb-4 flex-shrink-0">
           <div className="kicker">Сегодня</div>

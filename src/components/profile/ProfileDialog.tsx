@@ -113,7 +113,7 @@ export function ProfileDialog({ open, onOpenChange }: ProfileDialogProps) {
             <Label htmlFor="profile-name">Имя</Label>
             <Input id="profile-name" value={name} onChange={e => setName(e.target.value)} required />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor="profile-phone">Телефон</Label>
               <Input id="profile-phone" value={phone} onChange={e => setPhone(e.target.value)} placeholder="+996 ..." />
@@ -134,7 +134,7 @@ export function ProfileDialog({ open, onOpenChange }: ProfileDialogProps) {
           <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
             <KeyRound size={13} /> Смена пароля
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor="profile-new-password">Новый пароль</Label>
               <div className="relative">

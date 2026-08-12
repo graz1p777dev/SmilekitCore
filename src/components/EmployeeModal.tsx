@@ -224,7 +224,7 @@ export default function EmployeeModal({ employee, isNew, departments, roles, sch
 
           {/* ─── Основные данные ─── */}
           <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Основные данные</p>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="col-span-2 space-y-1">
               <Label className="text-xs font-semibold text-gray-500">ФИО *</Label>
               <Input
@@ -317,7 +317,7 @@ export default function EmployeeModal({ employee, isNew, departments, roles, sch
 
           {/* ─── Даты ─── */}
           <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Даты</p>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-1">
               <Label className="text-xs font-semibold text-gray-500">Дата приёма</Label>
               <Input
@@ -344,7 +344,7 @@ export default function EmployeeModal({ employee, isNew, departments, roles, sch
 
           {/* ─── Расписание ─── */}
           <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Расписание</p>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div className="space-y-1 min-w-0">
               <Label className="text-xs font-semibold text-gray-500">График</Label>
               <Select value={form.schedule_type} onValueChange={v => set('schedule_type', v ?? '5/2')}>

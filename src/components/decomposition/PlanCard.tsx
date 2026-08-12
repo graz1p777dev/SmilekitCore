@@ -56,8 +56,8 @@ export default function PlanCard({ data, view }: Props) {
       </div>
 
       {/* Тело */}
-      <div className="px-6 py-4">
-        <div className="grid grid-cols-4 gap-4 mb-4">
+      <div className="px-4 py-4 md:px-6">
+        <div className="grid grid-cols-2 gap-4 mb-4 lg:grid-cols-4">
           <div>
             <p className="text-[11px] mb-1 flex items-center gap-1" style={{ color: '#7d7174' }}><Calendar className="w-3 h-3" /> Начало</p>
             <p className="text-sm font-semibold" style={{ color: '#1b1517' }}>{fmtDate(year, month, 1)}</p>

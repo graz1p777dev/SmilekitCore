@@ -14,7 +14,7 @@ interface PageHeaderProps {
 export default function PageHeader({ title, subtitle, action }: PageHeaderProps) {
   return (
     <div
-      className="flex items-center justify-between gap-4 px-8 py-5"
+      className="flex items-center justify-between gap-4 px-4 py-4 md:px-8 md:py-5"
       style={{ background: '#ffffff', borderBottom: '1px solid #ece5e5' }}
     >
       <div className="span-rule min-w-0">

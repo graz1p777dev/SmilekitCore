@@ -77,7 +77,7 @@ export default function FinanceCharts({ daily, kpi }: Props) {
     <div className="space-y-3">
 
       {/* Строка 1: Выручка vs Расходы | Прибыль */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
         <GlassChartCard
           title="Выручка vs Расходы"
           action={<ChartTypeToggle value={revenueKind} onChange={setRevenueKind} />}
@@ -146,7 +146,7 @@ export default function FinanceCharts({ daily, kpi }: Props) {
       </div>
 
       {/* Строка 2: Структура расходов stacked | Cash Flow | Маржа */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
 
         <GlassChartCard title="Структура расходов">
           <ResponsiveContainer width="100%" height={H}>
