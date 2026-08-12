@@ -11,6 +11,7 @@ import { upsertDealFromInbound } from '@/lib/deals/auto-create'
 import { advanceDealFromBotAction } from '@/lib/deals/advance-stage'
 import { getAmoChatHistory, sendAmoChatMessage, sendAmoChatPicture, sendAmoChatVoice } from '@/lib/amocrm/chat'
 import { syncAmoChatHistory } from '@/lib/amocrm/history'
+import { createLimiter } from '@/lib/concurrency-limit'
 
 export interface InboundAmoMessage {
   amoMessageId: string
@@ -204,6 +205,16 @@ export async function registerOutgoingAmoMessage(input: InboundAmoMessage): Prom
 // цепочки достаточно.
 const chatQueues = new Map<string, Promise<void>>()
 
+// chatQueues сериализует только ВНУТРИ одного чата — разных чатов может
+// одновременно обрабатываться сколько угодно, и при всплеске сообщений
+// (амоCRM шлёт события пачками) это забивало тот же fetch-агент/Supabase,
+// которым обслуживаются обычные запросы CRM: карточка сделки виснет на
+// «Загружаем диалог…» дольше клиентского тайм-аута, хотя сама база отвечает
+// мгновенно (см. ПЕРЕДАЧА-CODEX-amocrm-канал.md, «Найденный и доказанный
+// root cause», проверено 2026-08-12 прямым тестом с того же прод-инстанса).
+// Общий потолок — сколько РАЗНЫХ чатов обрабатывается одновременно.
+const globalAmoProcessingLimit = createLimiter(4)
+
 /**
  * Менеджер написал в чат — бот больше не отвечает, ПОКА владелец явно не
  * вернёт ему управление тумблером в карточке сделки (amocrm_chat_control).
@@ -291,7 +302,9 @@ async function canSendAmoBotReply(
 
 function enqueueInboundAmoMessage(input: InboundAmoMessage, alreadyStored = false): Promise<void> {
   const prev = chatQueues.get(input.chatId) ?? Promise.resolve()
-  const run = prev.then(() => processInboundAmoMessageNow(input, alreadyStored))
+  const run = prev.then(() =>
+    globalAmoProcessingLimit(() => processInboundAmoMessageNow(input, alreadyStored))
+  )
   const chain = run.then(
     () => {},
     () => {}
