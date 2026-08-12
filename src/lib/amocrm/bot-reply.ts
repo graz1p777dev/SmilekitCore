@@ -245,7 +245,7 @@ export function processInboundAmoMessage(input: InboundAmoMessage): Promise<void
 }
 
 /** Подбирает после рестарта недавние сообщения, оставшиеся без ответа. */
-export async function replayRecentUnansweredAmoMessages(minutes = 15): Promise<void> {
+export async function replayRecentUnansweredAmoMessages(minutes = 120): Promise<void> {
   const supabase = createAdminClient()
   const { data, error } = await supabase
     .from('amocrm_messages')
