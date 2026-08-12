@@ -158,16 +158,30 @@ export async function sendAmoChatVoice(
 export async function sendAmoChatPicture(
   input: Omit<SendChatMessageInput, 'text'> & { mediaUrl: string; caption: string }
 ): Promise<void> {
+  // amojo принимает HTTP 200 и без метаданных, но WhatsApp в таком случае
+  // доставляет только подпись. Для picture API требует имя и размер файла.
+  const media = await getPictureMetadata(input.mediaUrl)
   try {
-    await sendWithSession(await getChatSession(), { ...input, text: input.caption }, 'picture')
+    await sendWithSession(await getChatSession(), { ...input, text: input.caption, ...media }, 'picture')
   } catch {
-    await sendWithSession(await getChatSession(true), { ...input, text: input.caption }, 'picture')
+    await sendWithSession(await getChatSession(true), { ...input, text: input.caption, ...media }, 'picture')
   }
+}
+
+async function getPictureMetadata(mediaUrl: string): Promise<{ fileName: string; fileSize: number }> {
+  const response = await fetch(mediaUrl, { signal: AbortSignal.timeout(15_000) })
+  if (!response.ok) throw new Error(`picture download: HTTP ${response.status}`)
+  const contentType = response.headers.get('content-type') ?? ''
+  if (!contentType.startsWith('image/')) throw new Error(`picture download: invalid type ${contentType}`)
+  const bytes = await response.arrayBuffer()
+  if (!bytes.byteLength) throw new Error('picture download: empty file')
+  const name = new URL(mediaUrl).pathname.split('/').pop() || 'image.jpg'
+  return { fileName: name, fileSize: bytes.byteLength }
 }
 
 async function sendWithSession(
   session: ChatSession,
-  input: SendChatMessageInput & { mediaUrl?: string },
+  input: SendChatMessageInput & { mediaUrl?: string; fileName?: string; fileSize?: number },
   messageType: 'text' | 'voice' | 'picture' = 'text'
 ): Promise<void> {
   const { chatId, leadId, contactId, text } = input
@@ -184,6 +198,8 @@ async function sendWithSession(
   if (messageType !== 'text' && input.mediaUrl) {
     payload.set('type', messageType)
     payload.set('media', input.mediaUrl)
+    if (input.fileName) payload.set('file_name', input.fileName)
+    if (input.fileSize) payload.set('file_size', String(input.fileSize))
   }
   const res = await fetch(`${AMOJO_BASE_URL}/v1/chats/${session.accountId}/${chatId}/messages`, {
     method: 'POST',
