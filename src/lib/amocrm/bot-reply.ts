@@ -265,6 +265,23 @@ async function isManagerControllingChat(
   return true // менеджер написал позже, чем включили бота — управление снова у него
 }
 
+/** Стоп-список рассылок (campaign_opt_outs) с флагом block_bot_replies —
+ * бот этому номеру не пишет вообще ничего, даже отвечая на входящее. */
+async function isPhoneBlockedForBot(
+  supabase: ReturnType<typeof createAdminClient>,
+  rawPhone: string | null
+): Promise<boolean> {
+  const phone = String(rawPhone || '').replace(/\D/g, '')
+  if (!phone) return false
+  const { data } = await supabase
+    .from('campaign_opt_outs')
+    .select('phone')
+    .eq('phone', phone)
+    .eq('block_bot_replies', true)
+    .maybeSingle()
+  return Boolean(data)
+}
+
 export interface AmoChatControlStatus {
   chatId: string | null
   managerControls: boolean
@@ -445,6 +462,11 @@ async function processInboundAmoMessageNow(input: InboundAmoMessage, alreadyStor
   // свежие исходящие из amojo, поэтому правило действует и для ответов из
   // amoCRM, и из WhatsApp.
   if (await isManagerControllingChat(supabase, input.chatId)) return
+
+  // Номер в стоп-списке с флагом «не отвечать ботом» (campaign_opt_outs,
+  // страница «Рассылки») — история и сделка ведутся как обычно, но бот
+  // этому номеру не пишет вообще ничего, даже если клиент сам написал первым.
+  if (await isPhoneBlockedForBot(supabase, input.customerPhone ?? input.authorName)) return
 
   // Этапы двигаются ВСЕГДА по намерению клиента — даже когда бот выключен:
   // выключатель глушит только ответы, а не трекинг воронки.

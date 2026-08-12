@@ -171,6 +171,7 @@ export async function scheduleCampaign(input: unknown): Promise<{ success: true;
 export interface OptOutRow {
   phone: string
   reason: string | null
+  block_bot_replies: boolean
   created_at: string
 }
 
@@ -180,14 +181,15 @@ export async function getOptOutPhones(): Promise<OptOutRow[]> {
   const admin = createAdminClient()
   const { data } = await admin
     .from('campaign_opt_outs')
-    .select('phone, reason, created_at')
+    .select('phone, reason, block_bot_replies, created_at')
     .order('created_at', { ascending: false })
   return (data ?? []) as OptOutRow[]
 }
 
 export async function addOptOutPhone(
   rawPhone: string,
-  reason: string
+  reason: string,
+  blockBotReplies: boolean
 ): Promise<{ success: true } | { success: false; error: string }> {
   const me = await viewer()
   if (!me || !['owner', 'rop'].includes(me.role)) return { success: false, error: 'Нет доступа' }
@@ -197,6 +199,7 @@ export async function addOptOutPhone(
   const { error } = await admin.from('campaign_opt_outs').upsert({
     phone,
     reason: reason.trim().slice(0, 300) || null,
+    block_bot_replies: blockBotReplies,
     created_by: me.id,
   })
   if (error) return { success: false, error: error.message }

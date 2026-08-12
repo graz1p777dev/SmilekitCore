@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { CalendarClock, CheckCircle2, Clock3, Send, ShieldCheck, ShieldX, Trash2, UsersRound, XCircle } from 'lucide-react'
+import { Bot, CalendarClock, CheckCircle2, Clock3, Send, ShieldCheck, ShieldX, Trash2, UsersRound, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   addOptOutPhone,
@@ -47,6 +47,7 @@ export default function CampaignsClient({ initialData }: { initialData: Campaign
   const [scheduledAt, setScheduledAt] = useState(defaultSchedule)
   const [optOutPhone, setOptOutPhone] = useState('')
   const [optOutReason, setOptOutReason] = useState('')
+  const [optOutBlockBot, setOptOutBlockBot] = useState(false)
 
   useEffect(() => {
     const timer = setInterval(() => router.refresh(), 15_000)
@@ -89,14 +90,15 @@ export default function CampaignsClient({ initialData }: { initialData: Campaign
     const phone = optOutPhone.trim()
     if (!phone) return
     startTransition(async () => {
-      const result = await addOptOutPhone(phone, optOutReason)
+      const result = await addOptOutPhone(phone, optOutReason, optOutBlockBot)
       if (!result.success) {
         toast.error(result.error)
         return
       }
-      toast.success('Номер добавлен в стоп-список рассылок')
+      toast.success(optOutBlockBot ? 'Номер добавлен: рассылки и бот отключены' : 'Номер добавлен в стоп-список рассылок')
       setOptOutPhone('')
       setOptOutReason('')
+      setOptOutBlockBot(false)
       router.refresh()
     })
   }
@@ -230,6 +232,15 @@ export default function CampaignsClient({ initialData }: { initialData: Campaign
                 <ShieldX /> Добавить
               </Button>
             </div>
+            <label className="mt-3 flex items-center gap-2 text-sm" style={{ color: 'var(--ink-2)' }}>
+              <input
+                type="checkbox"
+                checked={optOutBlockBot}
+                onChange={(event) => setOptOutBlockBot(event.target.checked)}
+                className="size-4 rounded"
+              />
+              Бот тоже не должен писать этому номеру (даже если он напишет первым)
+            </label>
 
             <div className="mt-4 space-y-2">
               {initialData.optOuts.length === 0 && (
@@ -238,7 +249,14 @@ export default function CampaignsClient({ initialData }: { initialData: Campaign
               {initialData.optOuts.map((row) => (
                 <div key={row.phone} className="flex items-center justify-between gap-3 rounded-xl px-3 py-2" style={{ background: 'var(--surface-2)' }}>
                   <div className="min-w-0">
-                    <p className="font-semibold tabular-nums" style={{ color: 'var(--ink)' }}>+{row.phone}</p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-semibold tabular-nums" style={{ color: 'var(--ink)' }}>+{row.phone}</p>
+                      {row.block_bot_replies && (
+                        <span className="flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ color: '#b45309', background: '#fef3c7' }}>
+                          <Bot className="size-3" /> бот молчит
+                        </span>
+                      )}
+                    </div>
                     {row.reason && <p className="truncate text-xs" style={{ color: 'var(--ink-3)' }}>{row.reason}</p>}
                   </div>
                   <button
