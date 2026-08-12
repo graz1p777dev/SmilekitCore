@@ -204,26 +204,89 @@ export async function registerOutgoingAmoMessage(input: InboundAmoMessage): Prom
 // цепочки достаточно.
 const chatQueues = new Map<string, Promise<void>>()
 
+/**
+ * Менеджер написал в чат — бот больше не отвечает, ПОКА владелец явно не
+ * вернёт ему управление тумблером в карточке сделки (amocrm_chat_control).
+ * Override действует только до следующего сообщения менеджера: если тот
+ * снова написал позже, чем включили бота, управление опять у человека —
+ * тумблер не «навсегда», а на текущий разговор.
+ */
+async function isManagerControllingChat(
+  supabase: ReturnType<typeof createAdminClient>,
+  chatId: string
+): Promise<boolean> {
+  const [lastOperatorResult, controlResult] = await Promise.all([
+    supabase
+      .from('amocrm_messages')
+      .select('created_at')
+      .eq('chat_id', chatId)
+      .eq('sender', 'operator')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from('amocrm_chat_control')
+      .select('bot_enabled, updated_at')
+      .eq('chat_id', chatId)
+      .maybeSingle(),
+  ])
+  const lastOperatorAt = lastOperatorResult.data?.created_at
+    ? new Date(lastOperatorResult.data.created_at as string).getTime()
+    : null
+  const control = controlResult.data as { bot_enabled: boolean; updated_at: string } | null
+  if (!control) return lastOperatorAt !== null
+  const overrideIsFresh = lastOperatorAt === null || new Date(control.updated_at).getTime() > lastOperatorAt
+  if (overrideIsFresh) return !control.bot_enabled
+  return true // менеджер написал позже, чем включили бота — управление снова у него
+}
+
+export interface AmoChatControlStatus {
+  chatId: string | null
+  managerControls: boolean
+}
+
+/** Статус чата сделки для тумблера в карточке (DealModal). */
+export async function getAmoChatControlStatus(leadId: string): Promise<AmoChatControlStatus> {
+  const supabase = createAdminClient()
+  const { data: chatRow } = await supabase
+    .from('amocrm_messages')
+    .select('chat_id')
+    .eq('lead_id', leadId)
+    .order('id', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  const chatId = (chatRow as { chat_id?: string } | null)?.chat_id ?? null
+  if (!chatId) return { chatId: null, managerControls: false }
+  return { chatId, managerControls: await isManagerControllingChat(supabase, chatId) }
+}
+
+/**
+ * Тумблер в карточке сделки: true — вернуть чат боту, false — явно забрать
+ * управление менеджеру, не дожидаясь его сообщения в чате.
+ */
+export async function setAmoChatBotEnabled(chatId: string, botEnabled: boolean, userId: string | null): Promise<void> {
+  const supabase = createAdminClient()
+  const { error } = await supabase.from('amocrm_chat_control').upsert(
+    { chat_id: chatId, bot_enabled: botEnabled, updated_at: new Date().toISOString(), updated_by: userId },
+    { onConflict: 'chat_id' }
+  )
+  if (error) throw new Error(`amocrm chat control upsert: ${error.message}`)
+}
+
 async function canSendAmoBotReply(
   supabase: ReturnType<typeof createAdminClient>,
   chatId: string
 ): Promise<boolean> {
-  const [integrationResult, operatorResult] = await Promise.all([
+  const [integrationResult, managerControls] = await Promise.all([
     supabase
       .from('integrations')
       .select('is_active')
       .eq('name', 'amoCRM')
       .maybeSingle(),
-    supabase
-      .from('amocrm_messages')
-      .select('id')
-      .eq('chat_id', chatId)
-      .eq('sender', 'operator')
-      .limit(1),
+    isManagerControllingChat(supabase, chatId),
   ])
-  if (integrationResult.error || operatorResult.error) return false
-  return Boolean((integrationResult.data as { is_active?: boolean } | null)?.is_active)
-    && !operatorResult.data?.length
+  if (integrationResult.error) return false
+  return Boolean((integrationResult.data as { is_active?: boolean } | null)?.is_active) && !managerControls
 }
 
 function enqueueInboundAmoMessage(input: InboundAmoMessage, alreadyStored = false): Promise<void> {
@@ -350,15 +413,11 @@ async function processInboundAmoMessageNow(input: InboundAmoMessage, alreadyStor
     console.error('amocrm bot-reply: history sync failed', error)
   }
   // Как только в диалог вступил менеджер, бот больше не отвечает в этом
-  // чате. Синхронизация выше сначала подтягивает свежие исходящие из amojo,
-  // поэтому правило действует и для ответов из amoCRM, и из WhatsApp.
-  const { data: operatorRows } = await supabase
-    .from('amocrm_messages')
-    .select('id')
-    .eq('chat_id', input.chatId)
-    .eq('sender', 'operator')
-    .limit(1)
-  if (operatorRows?.length) return
+  // чате — пока владелец явно не вернёт ему управление тумблером в карточке
+  // сделки (isManagerControllingChat). Синхронизация выше сначала подтягивает
+  // свежие исходящие из amojo, поэтому правило действует и для ответов из
+  // amoCRM, и из WhatsApp.
+  if (await isManagerControllingChat(supabase, input.chatId)) return
 
   // Этапы двигаются ВСЕГДА по намерению клиента — даже когда бот выключен:
   // выключатель глушит только ответы, а не трекинг воронки.

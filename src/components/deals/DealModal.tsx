@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useTransition } from 'react'
-import { X, Trash2, MessagesSquare, RefreshCw } from 'lucide-react'
+import { X, Trash2, MessagesSquare, RefreshCw, Bot, UserRound } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
@@ -21,6 +21,8 @@ import {
   updateDeal,
   deleteDeal,
   getDealConversation,
+  getDealBotControl,
+  setDealBotControl,
 } from '@/actions/deals'
 import type {
   Deal,
@@ -96,6 +98,8 @@ export default function DealModal({
   const [messages, setMessages] = useState<DealMessage[] | null>(null)
   const [chatNote, setChatNote] = useState<string | null>(null)
   const [conversationReload, setConversationReload] = useState(0)
+  const [botControl, setBotControl] = useState<{ chatId: string | null; managerControls: boolean } | null>(null)
+  const [togglingBotControl, setTogglingBotControl] = useState(false)
 
   const [form, setForm] = useState<FormState>(() => ({
     title: deal?.title ?? '',
@@ -143,6 +147,33 @@ export default function DealModal({
       window.clearTimeout(timeout)
     }
   }, [isNew, deal, conversationReload])
+
+  // Тумблер «кто ведёт чат» — только для сделок amoCRM, только когда в чате
+  // уже писал живой менеджер (иначе бот и так ведёт диалог, переключать нечего).
+  useEffect(() => {
+    if (isNew || !deal || deal.source !== 'amocrm') return
+    let alive = true
+    void getDealBotControl(deal.id).then((status) => {
+      if (alive) setBotControl(status)
+    })
+    return () => {
+      alive = false
+    }
+  }, [isNew, deal, conversationReload])
+
+  const handleToggleBotControl = async () => {
+    if (!botControl?.chatId) return
+    const nextBotEnabled = botControl.managerControls // сейчас у менеджера → включаем бота
+    setTogglingBotControl(true)
+    const res = await setDealBotControl(botControl.chatId, nextBotEnabled)
+    setTogglingBotControl(false)
+    if (!res.success) {
+      toast.error(res.error)
+      return
+    }
+    setBotControl({ ...botControl, managerControls: !nextBotEnabled })
+    toast.success(nextBotEnabled ? 'Чат передан боту' : 'Управление чатом у вас — бот не отвечает')
+  }
 
   const handleSave = () => {
     if (!form.title.trim()) {
@@ -381,9 +412,35 @@ export default function DealModal({
           {/* Переписка — только чтение, вести её продолжают там, где начали */}
           {!isNew && (
             <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <MessagesSquare size={14} className="text-gray-400" />
-                <Label>Переписка</Label>
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <MessagesSquare size={14} className="text-gray-400" />
+                  <Label>Переписка</Label>
+                </div>
+                {/* Тумблер появляется только когда в чате уже есть сообщение
+                    менеджера (или его вернули боту) — до этого бот и так
+                    отвечает сам, переключать нечего. */}
+                {botControl?.chatId && (
+                  <button
+                    type="button"
+                    onClick={handleToggleBotControl}
+                    disabled={togglingBotControl}
+                    title={
+                      botControl.managerControls
+                        ? 'Сейчас чат ведёте вы — нажмите, чтобы вернуть боту'
+                        : 'Сейчас отвечает бот — нажмите, чтобы забрать чат себе'
+                    }
+                    className={cn(
+                      'flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors disabled:opacity-60',
+                      botControl.managerControls
+                        ? 'bg-amber-50 text-amber-700 hover:bg-amber-100'
+                        : 'bg-[#f1ebfa] text-[#5115a4] hover:bg-[#e7dcf6]'
+                    )}
+                  >
+                    {botControl.managerControls ? <UserRound size={12} /> : <Bot size={12} />}
+                    {botControl.managerControls ? 'Ведёте вы — вернуть боту' : 'Ведёт бот — забрать себе'}
+                  </button>
+                )}
               </div>
               {messages === null ? (
                 <p className="text-[12px] text-gray-400">Загружаем диалог…</p>

@@ -12,6 +12,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { shopFetch, isShopConfigured } from '@/lib/shop-api'
 import { upsertDealFromInbound } from '@/lib/deals/auto-create'
 import { syncAmoChatHistory } from '@/lib/amocrm/history'
+import { getAmoChatControlStatus, setAmoChatBotEnabled } from '@/lib/amocrm/bot-reply'
 import type {
   Deal,
   DealEmployee,
@@ -509,4 +510,40 @@ async function loadDealConversation(dealId: string): Promise<DealConversation> {
     created_at: m.createdAt,
   }))
   return { messages, note: messages.length ? null : 'Сообщений пока нет' }
+}
+
+// ─── Управление ботом по конкретному чату amoCRM ─────────────────────────────
+// Как только в чат вступил живой менеджер, бот больше не отвечает в нём —
+// это правило по умолчанию. Тумблер в карточке сделки — явный override:
+// «вернуть чат боту» действует до следующего сообщения менеджера в этом же
+// чате (тогда управление снова у человека), см. isManagerControllingChat
+// в src/lib/amocrm/bot-reply.ts.
+
+export interface DealBotControl {
+  /** null — у сделки ещё нет ни одного сообщения amoCRM, тумблер показывать нечего. */
+  chatId: string | null
+  managerControls: boolean
+}
+
+export async function getDealBotControl(dealId: string): Promise<DealBotControl> {
+  const me = await getViewer()
+  if (!me) return { chatId: null, managerControls: false }
+
+  const supabase = await createClient()
+  const { data } = await supabase.from('deals').select('external_key').eq('id', dealId).maybeSingle()
+  const externalKey = (data as { external_key: string | null } | null)?.external_key
+  if (!externalKey?.startsWith('amocrm:')) return { chatId: null, managerControls: false }
+
+  return getAmoChatControlStatus(externalKey.slice('amocrm:'.length))
+}
+
+export async function setDealBotControl(chatId: string, botEnabled: boolean): Promise<DealActionResult> {
+  const me = await getViewer()
+  if (!me) return { success: false, error: 'Нет авторизации' }
+  try {
+    await setAmoChatBotEnabled(chatId, botEnabled, me.id)
+    return { success: true }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Не удалось переключить управление' }
+  }
 }
