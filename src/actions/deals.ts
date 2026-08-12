@@ -411,6 +411,11 @@ export async function getDealConversation(dealId: string): Promise<DealConversat
     let { data: rows } = await readStoredMessages()
     // Вебхук уже поддерживает живую историю. amojo нужен только для старого
     // диалога, которого ещё нет локально — не задерживаем им обычное открытие.
+    // amojo иногда подвисает дольше клиентского таймаута карточки (12с):
+    // getChatSession может уйти в 3 ретрая по 8с = до ~27с. Ограничиваем
+    // ожидание синхронизации отдельным потолком и не блокируем открытие
+    // сделки дольше него — sync доводим до конца в фоне, следующее открытие
+    // застанет уже сохранённые сообщения.
     if (!rows?.length) {
       const { data: chatRow } = await admin
         .from('amocrm_messages')
@@ -419,12 +424,23 @@ export async function getDealConversation(dealId: string): Promise<DealConversat
         .limit(1)
         .maybeSingle()
       if (chatRow?.chat_id) {
-        try {
-          await syncAmoChatHistory(String(chatRow.chat_id), leadId)
+        const chatId = String(chatRow.chat_id)
+        const sync = syncAmoChatHistory(chatId, leadId).catch((error) => {
+          console.error('deal conversation: amo history sync failed', error)
+        })
+        const timedOut = Symbol('timeout')
+        const raced = await Promise.race([
+          sync.then(() => 'done' as const),
+          new Promise<typeof timedOut>((resolve) => setTimeout(() => resolve(timedOut), 6_000)),
+        ])
+        if (raced === 'done') {
           const refreshed = await readStoredMessages()
           rows = refreshed.data
-        } catch (error) {
-          console.error('deal conversation: amo history sync failed', error)
+        } else {
+          return {
+            messages: [],
+            note: 'amoCRM отвечает медленнее обычного — история подгружается в фоне, откройте сделку ещё раз через несколько секунд.',
+          }
         }
       }
     }
