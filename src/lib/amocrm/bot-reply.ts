@@ -9,7 +9,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { smilekitBotFetch } from '@/lib/smilekit-bot-api'
 import { upsertDealFromInbound } from '@/lib/deals/auto-create'
 import { advanceDealFromBotAction } from '@/lib/deals/advance-stage'
-import { getAmoChatHistory, sendAmoChatMessage, sendAmoChatPicture, sendAmoChatVoice } from '@/lib/amocrm/chat'
+import { getAmoChatHistory, sendAmoChatMessage, sendAmoChatVoice } from '@/lib/amocrm/chat'
 import { syncAmoChatHistory } from '@/lib/amocrm/history'
 import { createLimiter } from '@/lib/concurrency-limit'
 
@@ -149,10 +149,15 @@ function shouldSendResultsAfterLocation(text: string, historyText: string): bool
 const ORDER_INTENT =
   /хочу\s+(?:заказать|купить|взять)|(?:как|где)\s+(?:заказать|купить|оформить)|закажу|заказать|оформить|оформляйте|оформляем|\bберу\b|возьму|можно\s+оформить|реквизит|куда\s+(?:скинуть|перевести|оплатить|платить)|как\s+оплатить|способ\s+оплаты|\bqr[\s-]?код/i
 
+const SMILEKIT_RESULTS_URL = 'https://smilekit.vercel.app/#results'
+
 // templates.py: DOUBT_RESULT_REPLY — дословно по ТЗ, «гарантируем», без
-// «у большинства». Срабатывает на сомнения в честности/реальности ДО покупки.
+// «у большинства», сохранено как есть. Срабатывает на сомнения в честности/
+// реальности ДО покупки — добавлена ссылка на страницу с реальными фото
+// до/после и перепиской с покупателями (проще, чем идти в Instagram).
 const DOUBT_RESULT_REPLY =
-  'Вы можете зайти в наш Instagram и посмотреть результаты других клиентов. ' +
+  'Понимаю, лучше один раз увидеть 😊 Вот страница с настоящими фото до/после ' +
+  `и перепиской с нашими покупателями — без прикрас: ${SMILEKIT_RESULTS_URL}\n\n` +
   'Мы гарантируем эффект уже после первого применения.'
 
 // sales.py: _SCAM_DOUBT + формулировки из реальных диалогов WhatsApp
@@ -628,39 +633,31 @@ async function processInboundAmoMessageNow(input: InboundAmoMessage, alreadyStor
       console.error('amocrm bot-reply: send failed', error)
       return
     }
-    if (sendResultPhotos && index === 0) {
-      const mediaBaseUrl = process.env.SMILEKIT_BOT_API_URL?.replace(/\/$/, '')
-      if (mediaBaseUrl) {
-        for (const [name, caption] of [['before.jpg', 'До'], ['after.jpg', 'После']] as const) {
-          if (!(await canSendAmoBotReply(supabase, input.chatId))) return
-          const photoMessageId = `bot:${input.amoMessageId}:result:${name}`
-          const { error: photoReserveError } = await supabase.from('amocrm_messages').upsert({
-            amo_message_id: photoMessageId,
-            chat_id: input.chatId,
-            lead_id: input.leadId,
-            contact_id: input.contactId,
-            direction: 'out',
-            sender: 'bot',
-            text: caption,
-          }, { onConflict: 'amo_message_id', ignoreDuplicates: true })
-          if (photoReserveError) {
-            console.error('amocrm bot-reply: result photo reserve failed', photoReserveError.message)
-            continue
-          }
-          try {
-            await sendAmoChatPicture({
-              chatId: input.chatId,
-              leadId: input.leadId,
-              contactId: input.contactId,
-              caption,
-              mediaUrl: `${mediaBaseUrl}/media/results/${name}`,
-            })
-          } catch (error) {
-            await supabase.from('amocrm_messages').delete().eq('amo_message_id', photoMessageId)
-            console.error('amocrm bot-reply: result photo send failed', error)
-          }
-          await new Promise((resolve) => setTimeout(resolve, 700))
+    if (sendResultPhotos && index === 0 && !replies.some((r) => r.includes(SMILEKIT_RESULTS_URL))) {
+      // Прямая отправка фото через amojo ненадёжна (WhatsApp иногда доставляет
+      // только подпись без картинки, см. ПЕРЕДАЧА-CODEX). Ссылка на страницу
+      // с фото до/после работает всегда и не зависит от формата amojo.
+      if (!(await canSendAmoBotReply(supabase, input.chatId))) return
+      const photoMessageId = `bot:${input.amoMessageId}:results-link`
+      const text = `Вот страница с реальными фото до/после наших клиентов 📸 ${SMILEKIT_RESULTS_URL}`
+      const { error: photoReserveError } = await supabase.from('amocrm_messages').upsert({
+        amo_message_id: photoMessageId,
+        chat_id: input.chatId,
+        lead_id: input.leadId,
+        contact_id: input.contactId,
+        direction: 'out',
+        sender: 'bot',
+        text,
+      }, { onConflict: 'amo_message_id', ignoreDuplicates: true })
+      if (!photoReserveError) {
+        try {
+          await sendAmoChatMessage({ chatId: input.chatId, leadId: input.leadId, contactId: input.contactId, text })
+        } catch (error) {
+          await supabase.from('amocrm_messages').delete().eq('amo_message_id', photoMessageId)
+          console.error('amocrm bot-reply: results link send failed', error)
         }
+      } else {
+        console.error('amocrm bot-reply: results link reserve failed', photoReserveError.message)
       }
     }
     if (index < replies.length - 1) {
