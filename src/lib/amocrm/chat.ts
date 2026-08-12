@@ -161,11 +161,13 @@ export async function sendAmoChatPicture(
   // amojo принимает HTTP 200 и без метаданных, но WhatsApp в таком случае
   // доставляет только подпись. Для picture API требует имя и размер файла.
   const media = await getPictureMetadata(input.mediaUrl)
+  const sentAfter = Date.now() - 5_000
   try {
     await sendWithSession(await getChatSession(), { ...input, text: input.caption, ...media }, 'picture')
   } catch {
     await sendWithSession(await getChatSession(true), { ...input, text: input.caption, ...media }, 'picture')
   }
+  await confirmPictureInAmoHistory(input.chatId, input.caption, sentAfter)
 }
 
 async function getPictureMetadata(mediaUrl: string): Promise<{ fileName: string; fileSize: number }> {
@@ -177,6 +179,22 @@ async function getPictureMetadata(mediaUrl: string): Promise<{ fileName: string;
   if (!bytes.byteLength) throw new Error('picture download: empty file')
   const name = new URL(mediaUrl).pathname.split('/').pop() || 'image.jpg'
   return { fileName: name, fileSize: bytes.byteLength }
+}
+
+async function confirmPictureInAmoHistory(chatId: string, caption: string, sentAfter: number): Promise<void> {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    await new Promise((resolve) => setTimeout(resolve, 700 * (attempt + 1)))
+    const history = await getAmoChatHistory(chatId, 30)
+    const delivered = history.some((message) =>
+      message.direction === 'out'
+      && message.messageType === 'picture'
+      && Boolean(message.mediaUrl)
+      && message.text === caption
+      && Date.parse(message.createdAt) >= sentAfter
+    )
+    if (delivered) return
+  }
+  throw new Error(`amojo picture verification failed: ${caption}`)
 }
 
 async function sendWithSession(
