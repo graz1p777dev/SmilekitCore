@@ -99,10 +99,31 @@ async function eligibleRecipients(dateFilter?: LastMessageDateFilter): Promise<R
     ),
     admin.from('campaign_opt_outs').select('phone'),
   ])
+  const chatControls = await fetchAllRows<{ chat_id: string; bot_enabled: boolean; updated_at: string }>(
+    admin, 'amocrm_chat_control', 'chat_id, bot_enabled, updated_at', (q) => q.order('chat_id')
+  )
   const purchased = new Set((orders ?? []).flatMap((row) => row.deal_id ? [String(row.deal_id)] : []))
   const excludedPhones = new Set((optOuts ?? []).map((row) => row.phone as string))
+  // «Менеджер ведёт чат» — та же логика, что в isManagerControllingChat
+  // (src/lib/amocrm/bot-reply.ts): запись в amocrm_chat_control перекрывает
+  // прошлые сообщения менеджера, но только до его следующего сообщения.
+  const controlByChat = new Map(chatControls.map((row) => [String(row.chat_id), row]))
+  const lastOperatorAtByChat = new Map<string, string>()
+  for (const row of amoMessages ?? []) {
+    if (row.sender !== 'operator') continue
+    const chatId = String(row.chat_id)
+    const known = lastOperatorAtByChat.get(chatId)
+    if (!known || row.created_at > known) lastOperatorAtByChat.set(chatId, row.created_at)
+  }
   const managerChats = new Set(
-    (amoMessages ?? []).filter((row) => row.sender === 'operator').map((row) => String(row.chat_id))
+    [...new Set((amoMessages ?? []).map((row) => String(row.chat_id)))].filter((chatId) => {
+      const lastOperatorAt = lastOperatorAtByChat.get(chatId) ?? null
+      const control = controlByChat.get(chatId)
+      if (!control) return lastOperatorAt !== null
+      const overrideIsFresh = lastOperatorAt === null
+        || new Date(control.updated_at).getTime() > new Date(lastOperatorAt).getTime()
+      return overrideIsFresh ? !control.bot_enabled : true
+    })
   )
   const amoByLead = new Map<string, { chatId: string; contactId: string | null }>()
   // amoMessages отсортирован id DESC — первое сообщение клиента на lead_id
