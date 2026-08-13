@@ -72,6 +72,13 @@ export default function OrderDetail({
   const who =
     order.customer_name || order.customer_username || order.customer_phone || 'Клиент без имени'
 
+  // Ссылка на чек — тем же маркером, что и в переписке сделки (см.
+  // MEDIA_MARKER в src/actions/deals.ts): отдельной колонки под вложения
+  // в orders нет, а плодить миграцию под одну ссылку избыточно.
+  const receiptMatch = order.summary?.match(/\n\[media\](\S+)$/)
+  const receiptUrl = receiptMatch?.[1] ?? null
+  const summaryText = receiptMatch ? order.summary!.slice(0, receiptMatch.index) : order.summary
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 md:p-8"
@@ -88,7 +95,11 @@ export default function OrderDetail({
             <h2 className="truncate text-lg font-bold" style={{ color: 'var(--ink)' }}>{who}</h2>
             <p className="mt-0.5 text-xs" style={{ color: 'var(--ink-3)' }}>
               Заказ от {formatOrderDate(order.created_at)} ·{' '}
-              {order.source === 'telegram_bot' ? 'из Telegram-бота' : 'заведён вручную'}
+              {order.source === 'telegram_bot'
+                ? 'из Telegram-бота'
+                : order.summary?.includes('(WhatsApp)')
+                  ? 'из WhatsApp-бота'
+                  : 'заведён вручную'}
             </p>
           </div>
           <button
@@ -165,14 +176,25 @@ export default function OrderDetail({
               className="mt-2 whitespace-pre-wrap rounded-2xl p-3.5 text-sm leading-relaxed"
               style={{ background: 'var(--brand-soft)', color: 'var(--ink-2)' }}
             >
-              {order.summary}
+              {summaryText}
             </p>
+            {receiptUrl && (
+              <a
+                href={receiptUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-2 inline-flex items-center gap-1.5 text-sm font-medium underline underline-offset-2"
+                style={{ color: 'var(--brand-ink)' }}
+              >
+                📎 Открыть чек
+              </a>
+            )}
           </>
         )}
 
         {deal && (
           <Link
-            href="/dashboard/deals"
+            href={`/dashboard/deals?deal=${deal.id}`}
             className="mt-4 flex items-center gap-2.5 rounded-2xl px-3.5 py-3 text-sm"
             style={{ border: '1px solid var(--line)', color: 'var(--ink-2)' }}
           >
@@ -181,6 +203,7 @@ export default function OrderDetail({
               Сделка: {deal.title}
               {deal.stage_name ? ` · ${deal.stage_name}` : ''}
             </span>
+            <span className="shrink-0 text-xs" style={{ color: 'var(--brand-ink)' }}>Написать →</span>
           </Link>
         )}
 

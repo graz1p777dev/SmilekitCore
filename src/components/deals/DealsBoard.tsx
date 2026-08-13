@@ -18,6 +18,8 @@ interface Props {
   initialDeals: Deal[]
   employees: DealEmployee[]
   me: DealViewer
+  /** Открыть карточку сразу при загрузке — переход со страницы «Заказы». */
+  initialOpenDealId?: string | null
 }
 
 interface ModalState {
@@ -37,7 +39,7 @@ function columnTotals(deals: Deal[]): string[] {
   return [...byCurrency.entries()].map(([currency, sum]) => formatMoney(sum, currency))
 }
 
-export default function DealsBoard({ initialStages, initialDeals, employees, me }: Props) {
+export default function DealsBoard({ initialStages, initialDeals, employees, me, initialOpenDealId }: Props) {
   const [deals, setDeals] = useState<Deal[]>(initialDeals)
   const [dragId, setDragId] = useState<string | null>(null)
   const [dragOverStage, setDragOverStage] = useState<string | null>(null)
@@ -46,6 +48,17 @@ export default function DealsBoard({ initialStages, initialDeals, employees, me 
     open: false, deal: null, isNew: false, stageId: '',
   })
   const [syncing, startSync] = useTransition()
+
+  // Переход со страницы «Заказы» — открываем карточку сразу, не дожидаясь
+  // клика по колонке. Однократно на маунт: initialOpenDealId — это заморозка
+  // URL на момент захода, а не то, что должно переоткрывать модалку заново
+  // при каждом ререндере.
+  useEffect(() => {
+    if (!initialOpenDealId) return
+    const target = initialDeals.find((d) => d.id === initialOpenDealId)
+    if (target) setModal({ open: true, deal: target, isNew: false, stageId: target.stage_id })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const stages = initialStages
   const defaultStageId = useMemo(

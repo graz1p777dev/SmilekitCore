@@ -18,6 +18,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { smilekitBotFetch } from '@/lib/smilekit-bot-api'
 import { upsertDealFromInbound } from '@/lib/deals/auto-create'
 import { advanceDealFromBotAction } from '@/lib/deals/advance-stage'
+import { ingestOrder } from '@/lib/orders/ingest'
 import { sendGreenApiFileByUrl, sendGreenApiMessage, sendGreenApiVoice } from '@/lib/greenapi/client'
 import { createLimiter } from '@/lib/concurrency-limit'
 
@@ -451,6 +452,37 @@ async function handleGreenApiReceipt(
     .order('created_at', { ascending: false })
     .limit(5)
   const clientNotes = (recent ?? []).map((row) => (row as { text: string }).text).filter(Boolean).join(' | ')
+
+  // Заказ в CRM — страница «Заказы» и карточка сделки должны видеть чек и
+  // адрес, а не только Telegram-группу доставки. Ссылка на чек — тем же
+  // маркером, что и в переписке (см. MEDIA_MARKER в src/actions/deals.ts).
+  const { data: dealRow } = await supabase.from('deals').select('id').eq('external_key', externalKey).maybeSingle()
+  await ingestOrder({
+    externalKey: `${externalKey}:order:${input.providerMessageId}`,
+    source: 'manual',
+    customerName: input.authorName,
+    customerPhone: input.chatId,
+    quantity: 1,
+    totalAmount: null,
+    currency: 'KGS',
+    summary:
+      `${verified ? 'Чек проверен' : checkUnavailable ? 'Чек не проверен автоматически' : 'Чек не прошёл проверку'} (WhatsApp)` +
+      (input.text ? `\nАдрес: ${input.text}` : '') +
+      `\n[media]${input.mediaUrl}`,
+  }).then((result) => {
+    if (result.error) console.error('greenapi bot-reply: order ingest failed', result.error)
+  })
+  if ((dealRow as { id?: string } | null)?.id) {
+    // ingestOrder не знает про deal_id — привязываем отдельно.
+    const { data: orderRow } = await supabase
+      .from('orders')
+      .select('id')
+      .eq('external_key', `${externalKey}:order:${input.providerMessageId}`)
+      .maybeSingle()
+    if ((orderRow as { id?: string } | null)?.id) {
+      await supabase.from('orders').update({ deal_id: (dealRow as { id: string }).id }).eq('id', (orderRow as { id: string }).id)
+    }
+  }
 
   try {
     const bytes = await fetch(input.mediaUrl!, { signal: AbortSignal.timeout(20_000) })
