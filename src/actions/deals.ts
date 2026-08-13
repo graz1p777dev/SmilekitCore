@@ -54,6 +54,32 @@ export interface DealsData {
   me: DealViewer | null
 }
 
+/**
+ * Supabase (PostgREST) молча обрезает любую выборку до 1000 строк — сервер
+ * игнорирует .limit() больше этого потолка (project max-rows), та же ловушка,
+ * что уже дважды находили в рассылках (src/actions/campaigns.ts). При 1109+
+ * сделках, отсортированных по created_at DESC, это отрезало 109 САМЫХ
+ * СТАРЫХ — то есть весь исходный импорт из amoCRM пропадал с доски целиком
+ * и не находился по прямой ссылке (?deal=...), хотя переход по ссылке
+ * технически срабатывал.
+ */
+async function fetchAllDeals(supabase: Awaited<ReturnType<typeof createClient>>): Promise<Deal[]> {
+  const PAGE_SIZE = 1000
+  const rows: Deal[] = []
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from('deals')
+      .select('*')
+      .is('deleted_at', null)
+      .order('created_at', { ascending: false })
+      .range(from, from + PAGE_SIZE - 1)
+    if (error) throw new Error(error.message)
+    rows.push(...((data ?? []) as Deal[]))
+    if (!data || data.length < PAGE_SIZE) break
+  }
+  return rows
+}
+
 export async function getDealsData(): Promise<DealsData> {
   const me = await getViewer()
   if (!me) return { stages: [], deals: [], employees: [], me: null }
@@ -63,16 +89,12 @@ export async function getDealsData(): Promise<DealsData> {
 
   // deal_stages/deals — через RLS-клиент: какие сделки видны, решает БД.
   // employees — через admin: имена нужны для пикера ответственного.
-  const [{ data: stages }, { data: deals }, { data: emps }] = await Promise.all([
+  const [{ data: stages }, deals, { data: emps }] = await Promise.all([
     supabase
       .from('deal_stages')
       .select('id, name, sort_order, kind, color, is_default, description')
       .order('sort_order'),
-    supabase
-      .from('deals')
-      .select('*')
-      .is('deleted_at', null)
-      .order('created_at', { ascending: false }),
+    fetchAllDeals(supabase),
     admin
       .from('employees')
       .select('id, name, avatar_url')
@@ -82,7 +104,7 @@ export async function getDealsData(): Promise<DealsData> {
 
   return {
     stages: (stages ?? []) as DealStage[],
-    deals: (deals ?? []) as Deal[],
+    deals,
     employees: (emps ?? []) as DealEmployee[],
     me,
   }

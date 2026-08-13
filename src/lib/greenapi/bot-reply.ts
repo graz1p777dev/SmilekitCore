@@ -566,6 +566,45 @@ async function handleGreenApiReceipt(
   }
 }
 
+/**
+ * У части клиентов уже есть старая сделка с amoCRM-эпохи (amocrm:<leadId>,
+ * тот же номер) — до переезда WhatsApp-канала на Green API. Без этой проверки
+ * такой клиент получал ВТОРУЮ, новую сделку (greenapi:<phone>) на каждое
+ * первое сообщение после переезда: два external_key на одного человека,
+ * split-история, деньги считаются дважды в отчётах. Найдено на живых
+ * данных 2026-08-14: один такой дубль уже возник за сутки.
+ */
+async function resolveGreenApiExternalKey(
+  supabase: ReturnType<typeof createAdminClient>,
+  phone: string
+): Promise<string> {
+  const greenApiKey = `greenapi:${phone}`
+  const { data: own } = await supabase.from('deals').select('id').eq('external_key', greenApiKey).maybeSingle()
+  if (own) return greenApiKey // обычный случай — разговор уже был через Green API
+
+  // Свежих сообщений через greenapi: нет — ищем старую сделку по номеру.
+  // Точное совпадение через .eq не годится: customer_phone хранится в разных
+  // форматах ('+996 502 223 421' vs '996502223421'), поэтому фильтруем по
+  // последним 9 цифрам (локальный номер без кода страны) и сверяем в JS.
+  const suffix = phone.slice(-9)
+  if (suffix.length === 9) {
+    const { data: candidates } = await supabase
+      .from('deals')
+      .select('external_key, customer_phone')
+      .ilike('customer_phone', `%${suffix}`)
+      .limit(10)
+    const match = (candidates ?? []).find((row) => {
+      const key = String((row as { external_key: string | null }).external_key || '')
+      if (!key.startsWith('amocrm:')) return false
+      const rowPhone = String((row as { customer_phone: string | null }).customer_phone || '').replace(/\D/g, '')
+      return rowPhone.endsWith(phone) || phone.endsWith(rowPhone)
+    })
+    if (match) return String((match as { external_key: string }).external_key)
+  }
+
+  return greenApiKey
+}
+
 async function processInboundGreenApiMessageNow(input: InboundGreenApiMessage): Promise<void> {
   const supabase = createAdminClient()
 
@@ -599,7 +638,7 @@ async function processInboundGreenApiMessageNow(input: InboundGreenApiMessage): 
   }
   if (!inserted?.length) return // дубль вебхука — уже обработано
 
-  const externalKey = `greenapi:${input.chatId}`
+  const externalKey = await resolveGreenApiExternalKey(supabase, input.chatId)
   const { data: integration } = await supabase
     .from('integrations')
     .select('is_active')
@@ -607,12 +646,14 @@ async function processInboundGreenApiMessageNow(input: InboundGreenApiMessage): 
     .maybeSingle()
   const botEnabled = Boolean((integration as { is_active?: boolean } | null)?.is_active)
 
-  await upsertDealFromInbound({
-    externalKey,
-    source: 'whatsapp',
-    customerName: input.authorName,
-    customerPhone: input.chatId,
-  })
+  if (externalKey.startsWith('greenapi:')) {
+    await upsertDealFromInbound({
+      externalKey,
+      source: 'whatsapp',
+      customerName: input.authorName,
+      customerPhone: input.chatId,
+    })
+  }
 
   if (await isManagerControllingChat(supabase, input.chatId)) return
   if (await isPhoneBlockedForBot(supabase, input.chatId)) return
