@@ -39,6 +39,21 @@ async function send(recipient: Recipient, campaign: Campaign) {
     if (!result.ok) throw new Error(result.error)
     return
   }
+  // Записываем ДО отправки как своё сообщение: иначе исходящее эхо из вебхука
+  // amoCRM не опознаётся (registerOutgoingAmoMessage ищет свежую строку с
+  // sender='bot' и тем же текстом) и рассылка выглядит как «менеджер вступил
+  // в диалог» — бот после этого замолкает в чате навсегда, а чат выпадает из
+  // аудитории следующих рассылок.
+  const admin = createAdminClient()
+  await admin.from('amocrm_messages').upsert({
+    amo_message_id: `campaign:${campaign.id}:${recipient.id}`,
+    chat_id: recipient.chat_id,
+    lead_id: recipient.lead_id,
+    contact_id: recipient.contact_id,
+    direction: 'out',
+    sender: 'bot',
+    text: campaign.message,
+  }, { onConflict: 'amo_message_id', ignoreDuplicates: true })
   await sendAmoChatMessage({
     chatId: recipient.chat_id,
     leadId: recipient.lead_id,
