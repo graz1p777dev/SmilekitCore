@@ -48,21 +48,41 @@ interface ReceiptCheck {
  * получатель, дата. Раньше картинки не обрабатывались вовсе: бот видел только
  * подпись к фото и предлагал предоплату уже оплатившему клиенту.
  */
-async function verifyGreenApiReceipt(mediaUrl: string): Promise<ReceiptCheck | null> {
+async function verifyGreenApiReceipt(mediaUrl: string, referenceDate: string): Promise<ReceiptCheck | null> {
   const response = await fetch(mediaUrl, { signal: AbortSignal.timeout(20_000) })
   if (!response.ok) throw new Error(`greenapi receipt download: HTTP ${response.status}`)
   const bytes = Buffer.from(await response.arrayBuffer())
   if (!bytes.length || bytes.length > MAX_RECEIPT_BYTES) throw new Error('greenapi receipt: invalid size')
   const mime = response.headers.get('content-type') ?? 'image/jpeg'
   const isPdf = mime.includes('pdf')
-  // Дата нужна модели: она не знает сегодняшнее число и иначе не отличит
-  // сегодняшний чек от прошлогоднего.
-  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bishkek' }).format(new Date())
   const result = await smilekitBotFetch<ReceiptCheck>('/internal/verify_receipt', {
     method: 'POST',
-    body: { imageBase64: bytes.toString('base64'), today, kind: isPdf ? 'pdf' : 'image', mime },
+    body: { imageBase64: bytes.toString('base64'), today: referenceDate, kind: isPdf ? 'pdf' : 'image', mime },
   })
   return result.ok ? result.data : null
+}
+
+/**
+ * Дата, с которой сверяется чек. Это день отправки QR, а не «сегодня»: клиент
+ * получает QR вечером и платит после полуночи — по «сегодня» такой чек
+ * считался бы вчерашним и отклонялся. Если QR в истории нет — сегодняшний день.
+ */
+async function receiptReferenceDate(
+  supabase: ReturnType<typeof createAdminClient>,
+  chatId: string
+): Promise<string> {
+  const bishkekDate = (value: Date) =>
+    new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bishkek' }).format(value)
+  const { data } = await supabase
+    .from('amocrm_messages')
+    .select('created_at')
+    .eq('chat_id', chatId)
+    .eq('text', '[QR оплаты]')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  const sentAt = (data as { created_at?: string } | null)?.created_at
+  return bishkekDate(sentAt ? new Date(sentAt) : new Date())
 }
 
 const RECEIPT_ACCEPTED =
@@ -388,10 +408,16 @@ async function handleGreenApiReceipt(
 ): Promise<void> {
   let check: ReceiptCheck | null = null
   try {
-    check = await verifyGreenApiReceipt(input.mediaUrl!)
+    check = await verifyGreenApiReceipt(input.mediaUrl!, await receiptReferenceDate(supabase, input.chatId))
   } catch (error) {
     console.error('greenapi bot-reply: receipt verification failed', error)
   }
+  // Проверка не отработала (нет ответа или все критерии false — так падает
+  // verify_receipt при сбое) — это не «чек плохой», а «мы не смогли
+  // проверить». Разница важна: иначе менеджер видит в группе четыре ложные
+  // причины несовпадения на идеальном чеке.
+  const checkUnavailable =
+    !check || !(check.is_real_receipt_screenshot || check.amount_ok || check.recipient_ok || check.date_ok)
   const verified = Boolean(
     check?.is_real_receipt_screenshot && check.amount_ok && check.recipient_ok && check.date_ok
   )
@@ -439,12 +465,14 @@ async function handleGreenApiReceipt(
         customerPhone: input.chatId,
         address: input.text || null,
         orderSummary: clientNotes.slice(0, 350),
-        mismatchReasons: verified ? null : [
-          !check?.is_real_receipt_screenshot ? 'не похоже на скриншот перевода' : null,
-          check && !check.amount_ok ? 'сумма не совпадает' : null,
-          check && !check.recipient_ok ? 'получатель не совпадает' : null,
-          check && !check.date_ok ? 'дата не совпадает' : null,
-        ].filter(Boolean),
+        mismatchReasons: verified ? null : checkUnavailable
+          ? ['автопроверка недоступна — проверьте чек глазами']
+          : [
+            !check?.is_real_receipt_screenshot ? 'не похоже на скриншот перевода' : null,
+            check && !check.amount_ok ? 'сумма не совпадает' : null,
+            check && !check.recipient_ok ? 'получатель не совпадает' : null,
+            check && !check.date_ok ? 'дата не совпадает' : null,
+          ].filter(Boolean),
       },
     })
     if (!pushed.ok) console.error('greenapi bot-reply: delivery push failed', pushed.error)
