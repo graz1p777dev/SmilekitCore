@@ -14,7 +14,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { smilekitBotFetch } from '@/lib/smilekit-bot-api'
 import { upsertDealFromInbound } from '@/lib/deals/auto-create'
 import { advanceDealFromBotAction } from '@/lib/deals/advance-stage'
-import { sendGreenApiMessage } from '@/lib/greenapi/client'
+import { sendGreenApiFileByUrl, sendGreenApiMessage, sendGreenApiVoice } from '@/lib/greenapi/client'
 import { createLimiter } from '@/lib/concurrency-limit'
 
 export interface InboundGreenApiMessage {
@@ -346,7 +346,10 @@ async function processInboundGreenApiMessageNow(input: InboundGreenApiMessage): 
   const isKyrgyz = KYRGYZ_MARKERS.test(input.text)
 
   const replies: string[] = []
-  let sendResultsLink = shouldSendResultsAfterLocation(input.text, historyText)
+  // Голосовые — как в Telegram: озвучиваем те же две реплики заранее
+  // записанными файлами (assets/voice в боте), текст остаётся тем же.
+  const voiceReplies = new Set<string>()
+  let sendResultPhotos = shouldSendResultsAfterLocation(input.text, historyText)
   let stageAction: string | null = null
   const deliveryTemplate = deliveryTemplateForCity(input.text)
 
@@ -364,6 +367,7 @@ async function processInboundGreenApiMessageNow(input: InboundGreenApiMessage): 
     replies.push(PRODUCT_INFO, CITY_QUESTION)
   } else if (SCAM_DOUBT.test(input.text)) {
     replies.push(DOUBT_RESULT_REPLY)
+    voiceReplies.add(DOUBT_RESULT_REPLY)
   } else if (COMPLAINT.test(input.text)) {
     replies.push(COMPLAINT_PROMPT)
   } else if (COOPERATION.test(input.text)) {
@@ -374,7 +378,8 @@ async function processInboundGreenApiMessageNow(input: InboundGreenApiMessage): 
   } else if (deliveryTemplate && (historyText.includes('цена') || historyText.includes('сом'))) {
     replies.push(deliveryTemplate, FIRST_USE_EFFECT)
     replies.push(historyText.includes('скидк') ? 'Оформить вам? Пока есть в наличии.' : LOW_STOCK_DISCOUNT_CTA)
-    sendResultsLink = true
+    sendResultPhotos = true
+    voiceReplies.add(FIRST_USE_EFFECT)
   }
 
   if (replies.length === 0) {
@@ -400,9 +405,8 @@ async function processInboundGreenApiMessageNow(input: InboundGreenApiMessage): 
     if (replies.length === 0) return
   }
 
-  if (sendResultsLink && !replies.some((r) => r.includes(SMILEKIT_RESULTS_URL))) {
-    replies.push(`Вот страница с реальными фото до/после наших клиентов 📸 ${SMILEKIT_RESULTS_URL}`)
-  }
+  const chatId = `${input.chatId}@c.us`
+  const mediaBaseUrl = process.env.SMILEKIT_BOT_API_URL?.replace(/\/$/, '')
 
   for (let index = 0; index < replies.length; index++) {
     if (!(await canSendGreenApiBotReply(supabase, input.chatId))) return
@@ -421,11 +425,58 @@ async function processInboundGreenApiMessageNow(input: InboundGreenApiMessage): 
       return
     }
     try {
-      await sendGreenApiMessage(`${input.chatId}@c.us`, text)
+      // Голосовое вместо текста — те же файлы, что шлёт Telegram-бот.
+      // Green API рендерит голосовой «пузырь» только для .ogg/Opus, поэтому
+      // при любой ошибке откатываемся на текст, чтобы клиент не остался без
+      // ответа.
+      const voiceName = text === FIRST_USE_EFFECT ? 'first_use_effect.ogg' : 'not_scam.ogg'
+      if (voiceReplies.has(text) && mediaBaseUrl) {
+        try {
+          await sendGreenApiVoice(chatId, `${mediaBaseUrl}/media/voice/${voiceName}`, voiceName)
+        } catch (error) {
+          console.error('greenapi bot-reply: voice send failed, using text', error)
+          await sendGreenApiMessage(chatId, text)
+        }
+      } else {
+        await sendGreenApiMessage(chatId, text)
+      }
     } catch (error) {
       await supabase.from('bot_messages').delete().eq('provider', 'greenapi').eq('provider_message_id', botMessageId)
       console.error('greenapi bot-reply: send failed', error)
       return
+    }
+    // Фото до/после — сразу после первой реплики, как в Telegram. Green API
+    // шлёт настоящие картинки по ссылке (sendFileByUrl), поэтому здесь не
+    // нужен обходной путь со ссылкой на сайт, как в amoCRM-канале.
+    if (sendResultPhotos && index === 0 && mediaBaseUrl) {
+      for (const [name, caption] of [['before.jpg', 'До'], ['after.jpg', 'После']] as const) {
+        if (!(await canSendGreenApiBotReply(supabase, input.chatId))) return
+        const photoMessageId = `bot:${input.providerMessageId}:result:${name}`
+        const { error: photoReserveError } = await supabase.from('bot_messages').upsert({
+          provider: 'greenapi',
+          provider_message_id: photoMessageId,
+          chat_id: input.chatId,
+          direction: 'out',
+          sender: 'bot',
+          text: caption,
+        }, { onConflict: 'provider,provider_message_id', ignoreDuplicates: true })
+        if (photoReserveError) {
+          console.error('greenapi bot-reply: result photo reserve failed', photoReserveError.message)
+          continue
+        }
+        try {
+          await sendGreenApiFileByUrl({
+            chatId,
+            urlFile: `${mediaBaseUrl}/media/results/${name}`,
+            fileName: name,
+            caption,
+          })
+        } catch (error) {
+          await supabase.from('bot_messages').delete().eq('provider', 'greenapi').eq('provider_message_id', photoMessageId)
+          console.error('greenapi bot-reply: result photo send failed', error)
+        }
+        await new Promise((resolve) => setTimeout(resolve, 700))
+      }
     }
     if (index < replies.length - 1) {
       await new Promise((resolve) => setTimeout(resolve, 900 + Math.random() * 500))
