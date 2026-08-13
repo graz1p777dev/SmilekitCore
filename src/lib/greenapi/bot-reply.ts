@@ -182,7 +182,10 @@ const ORDER_INTENT =
 // вместо чек-листа получал произвольную формулировку.
 const AFFIRMATIVE_ONLY =
   /^\s*(?:да|ага|угу|давай(?:те)?|ок(?:ей)?|хорошо|конечно|согласен|согласна|можно)[\s!.,)😊👍]*$/i
-const ORDER_CTA_MARKER = /оформить вам|продолжим оформление/i
+// ИИ формулирует призыв по-разному: «Оформить вам?», «Вам оформить доставку?»,
+// «Оформить?» — привязка к точному порядку слов не работала, и согласие
+// клиента уходило в ИИ вместо чек-листа.
+const ORDER_CTA_MARKER = /оформ\w*[^.!?]*\?/i
 
 // Подводка перед фото — дословно как в Telegram (__main__.py).
 const RESULTS_INTRO = 'Вот результат нашего клиента до и после применения 👇'
@@ -549,6 +552,7 @@ async function processInboundGreenApiMessageNow(input: InboundGreenApiMessage): 
   // Голосовые — как в Telegram: озвучиваем те же две реплики заранее
   // записанными файлами (assets/voice в боте), текст остаётся тем же.
   const voiceReplies = new Set<string>()
+  let sendPaymentQr = false
   let stageAction: string | null = null
   const deliveryTemplate = deliveryTemplateForCity(input.text)
   const priceKnown = historyText.includes('цена') || historyText.includes('сом')
@@ -586,7 +590,12 @@ async function processInboundGreenApiMessageNow(input: InboundGreenApiMessage): 
   } else if (COOPERATION.test(input.text)) {
     replies.push(COOPERATION_REPLY)
   } else if (ORDER_INTENT.test(input.text) || acceptedOrderCta) {
+    // QR отправляется сразу вместе с чек-листом (ниже, sendPaymentQr) — раньше
+    // WhatsApp не умел слать картинки, поэтому клиента отправляли к менеджеру
+    // за реквизитами. Green API картинки шлёт, так что ждать «подтверждения»
+    // перед выдачей реквизитов больше не нужно.
     replies.push(ORDER_CHECKLIST)
+    sendPaymentQr = true
     stageAction = 'order'
   } else if (deliveryTemplate && priceKnown && resultsBlockAllowed) {
     replies.push(deliveryTemplate, FIRST_USE_EFFECT)
@@ -655,6 +664,31 @@ async function processInboundGreenApiMessageNow(input: InboundGreenApiMessage): 
       await supabase.from('amocrm_messages').delete().eq('amo_message_id', `ga:${botMessageId}`)
       console.error('greenapi bot-reply: send failed', error)
       return
+    }
+    // QR оплаты — сразу за чек-листом, до всего остального: клиент попросил
+    // оформить и должен получить реквизиты в том же сообщении-связке, а не
+    // после отдельного «подтверждения».
+    if (sendPaymentQr && index === 0 && mediaBaseUrl) {
+      const qrMessageId = `ga:bot:${input.providerMessageId}:qr`
+      const { error: qrReserveError } = await supabase.from('amocrm_messages').upsert({
+        amo_message_id: qrMessageId,
+        chat_id: input.chatId,
+        direction: 'out',
+        sender: 'bot',
+        text: '[QR оплаты]',
+      }, { onConflict: 'amo_message_id', ignoreDuplicates: true })
+      if (!qrReserveError) {
+        try {
+          await sendGreenApiFileByUrl({
+            chatId,
+            urlFile: `${mediaBaseUrl}/media/results/qrcode.jpeg`,
+            fileName: 'qrcode.jpeg',
+          })
+        } catch (error) {
+          await supabase.from('amocrm_messages').delete().eq('amo_message_id', qrMessageId)
+          console.error('greenapi bot-reply: qr send failed', error)
+        }
+      }
     }
     // Фото результатов — сразу после первой реплики, как в Telegram
     // (__main__.py: подводка -> send_media_group -> голосовое -> CTA).
