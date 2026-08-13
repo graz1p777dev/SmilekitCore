@@ -98,3 +98,28 @@ export async function sendGreenApiFileByUrl(input: SendGreenApiFileInput): Promi
 export async function sendGreenApiVoice(chatId: string, urlFile: string, fileName = 'voice.ogg'): Promise<{ idMessage: string }> {
   return sendGreenApiFileByUrl({ chatId, urlFile, fileName })
 }
+
+/** chatId группы WhatsApp: тот же формат отправки, но суффикс @g.us. */
+export function toGreenApiGroupChatId(groupId: string): string {
+  return groupId.endsWith('@g.us') ? groupId : `${groupId}@g.us`
+}
+
+/**
+ * Отправка в группу WhatsApp (например «Доставки»). Группа берётся из
+ * GREENAPI_DELIVERY_GROUP_ID; пока переменная не задана — функция ничего не
+ * шлёт и возвращает false, чтобы включение было осознанным действием.
+ */
+export async function sendGreenApiDeliveryGroup(text: string): Promise<boolean> {
+  const groupId = process.env.GREENAPI_DELIVERY_GROUP_ID
+  if (!groupId) return false
+  await sendGreenApiMessage(toGreenApiGroupChatId(groupId), text)
+  return true
+}
+
+/** То же для файла — чек/фото заказа в группу. */
+export async function sendGreenApiDeliveryGroupFile(input: Omit<SendGreenApiFileInput, 'chatId'>): Promise<boolean> {
+  const groupId = process.env.GREENAPI_DELIVERY_GROUP_ID
+  if (!groupId) return false
+  await sendGreenApiFileByUrl({ ...input, chatId: toGreenApiGroupChatId(groupId) })
+  return true
+}

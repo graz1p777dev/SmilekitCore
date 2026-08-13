@@ -47,7 +47,11 @@ export async function POST(request: NextRequest) {
   const authorName = body.senderData?.senderName || body.senderData?.chatName || null
 
   if (body.typeWebhook === 'incomingMessageReceived') {
-    if (!text && typeMessage !== 'audioMessage') return NextResponse.json({ ok: true })
+    // Голосовые и картинки приходят без текста, но обрабатываются
+    // (расшифровка речи и проверка чека) — отбрасываем только то, где нет ни
+    // текста, ни файла.
+    const hasMedia = Boolean(body.messageData?.fileMessageData?.downloadUrl)
+    if (!text && !hasMedia) return NextResponse.json({ ok: true })
     void processInboundGreenApiMessage({
       providerMessageId,
       chatId: phone,

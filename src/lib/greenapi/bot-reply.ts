@@ -31,7 +31,46 @@ export interface InboundGreenApiMessage {
 }
 
 const VOICE_TYPES = new Set(['voice', 'audio', 'audioMessage'])
+const IMAGE_TYPES = new Set(['image', 'imageMessage', 'documentMessage'])
 const MAX_VOICE_BYTES = 20 * 1024 * 1024
+const MAX_RECEIPT_BYTES = 20 * 1024 * 1024
+
+interface ReceiptCheck {
+  is_real_receipt_screenshot: boolean
+  amount_ok: boolean
+  recipient_ok: boolean
+  date_ok: boolean
+}
+
+/**
+ * Клиент прислал картинку — почти всегда это чек об оплате. Проверяем теми же
+ * критериями, что и Telegram-бот (assistant.verify_receipt): формат, сумма,
+ * получатель, дата. Раньше картинки не обрабатывались вовсе: бот видел только
+ * подпись к фото и предлагал предоплату уже оплатившему клиенту.
+ */
+async function verifyGreenApiReceipt(mediaUrl: string): Promise<ReceiptCheck | null> {
+  const response = await fetch(mediaUrl, { signal: AbortSignal.timeout(20_000) })
+  if (!response.ok) throw new Error(`greenapi receipt download: HTTP ${response.status}`)
+  const bytes = Buffer.from(await response.arrayBuffer())
+  if (!bytes.length || bytes.length > MAX_RECEIPT_BYTES) throw new Error('greenapi receipt: invalid size')
+  const mime = response.headers.get('content-type') ?? 'image/jpeg'
+  const isPdf = mime.includes('pdf')
+  // Дата нужна модели: она не знает сегодняшнее число и иначе не отличит
+  // сегодняшний чек от прошлогоднего.
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bishkek' }).format(new Date())
+  const result = await smilekitBotFetch<ReceiptCheck>('/internal/verify_receipt', {
+    method: 'POST',
+    body: { imageBase64: bytes.toString('base64'), today, kind: isPdf ? 'pdf' : 'image', mime },
+  })
+  return result.ok ? result.data : null
+}
+
+const RECEIPT_ACCEPTED =
+  'Спасибо, чек получила! ✅ Заказ оформлен — передаю в доставку.\n\n' +
+  'Курьер свяжется с вами перед выездом.'
+
+const RECEIPT_REJECTED =
+  'Спасибо! Чек ушёл на проверку менеджеру — он свяжется с вами в ближайшее время. 😊'
 
 async function transcribeGreenApiVoice(input: InboundGreenApiMessage): Promise<string | null> {
   if (!VOICE_TYPES.has(input.messageType ?? '') || !input.mediaUrl) return input.text
@@ -333,6 +372,89 @@ export function processInboundGreenApiMessage(input: InboundGreenApiMessage): Pr
   return enqueueInboundGreenApiMessage(input)
 }
 
+/**
+ * Чек от клиента: проверить → ответить → отправить заказ в группу доставки
+ * Telegram (тот же чат, куда падают заказы из Telegram-бота). Чек, не прошедший
+ * проверку, всё равно уходит в группу — с пометкой для ручной проверки, чтобы
+ * менеджер увидел его, а не потерял.
+ */
+async function handleGreenApiReceipt(
+  supabase: ReturnType<typeof createAdminClient>,
+  input: InboundGreenApiMessage,
+  externalKey: string
+): Promise<void> {
+  let check: ReceiptCheck | null = null
+  try {
+    check = await verifyGreenApiReceipt(input.mediaUrl!)
+  } catch (error) {
+    console.error('greenapi bot-reply: receipt verification failed', error)
+  }
+  const verified = Boolean(
+    check?.is_real_receipt_screenshot && check.amount_ok && check.recipient_ok && check.date_ok
+  )
+  const reply = verified ? RECEIPT_ACCEPTED : RECEIPT_REJECTED
+
+  if (!(await canSendGreenApiBotReply(supabase, input.chatId))) return
+  const botMessageId = `ga:bot:${input.providerMessageId}:receipt`
+  await supabase.from('amocrm_messages').upsert({
+    amo_message_id: botMessageId,
+    chat_id: input.chatId,
+    direction: 'out',
+    sender: 'bot',
+    text: reply,
+  }, { onConflict: 'amo_message_id', ignoreDuplicates: true })
+  try {
+    await sendGreenApiMessage(`${input.chatId}@c.us`, reply)
+  } catch (error) {
+    await supabase.from('amocrm_messages').delete().eq('amo_message_id', botMessageId)
+    console.error('greenapi bot-reply: receipt reply failed', error)
+    return
+  }
+
+  // Адрес клиент обычно пишет подписью к чеку или соседним сообщением —
+  // берём последние свои сообщения, чтобы менеджеру в группе не пришлось
+  // лезть в переписку.
+  const { data: recent } = await supabase
+    .from('amocrm_messages')
+    .select('text, sender')
+    .eq('chat_id', input.chatId)
+    .eq('sender', 'client')
+    .order('created_at', { ascending: false })
+    .limit(5)
+  const clientNotes = (recent ?? []).map((row) => (row as { text: string }).text).filter(Boolean).join(' | ')
+
+  try {
+    const bytes = await fetch(input.mediaUrl!, { signal: AbortSignal.timeout(20_000) })
+      .then((response) => response.arrayBuffer())
+    const pushed = await smilekitBotFetch('/internal/push_delivery', {
+      method: 'POST',
+      body: {
+        imageBase64: Buffer.from(bytes).toString('base64'),
+        kind: 'image',
+        source: 'WhatsApp',
+        customerName: input.authorName ?? null,
+        customerPhone: input.chatId,
+        address: input.text || null,
+        orderSummary: clientNotes.slice(0, 350),
+        mismatchReasons: verified ? null : [
+          !check?.is_real_receipt_screenshot ? 'не похоже на скриншот перевода' : null,
+          check && !check.amount_ok ? 'сумма не совпадает' : null,
+          check && !check.recipient_ok ? 'получатель не совпадает' : null,
+          check && !check.date_ok ? 'дата не совпадает' : null,
+        ].filter(Boolean),
+      },
+    })
+    if (!pushed.ok) console.error('greenapi bot-reply: delivery push failed', pushed.error)
+  } catch (error) {
+    console.error('greenapi bot-reply: delivery push failed', error)
+  }
+
+  const advanced = await advanceDealFromBotAction(externalKey, 'order')
+  if (!advanced.ok && advanced.error) {
+    console.error('greenapi bot-reply: stage advance failed', 'order', advanced.error)
+  }
+}
+
 async function processInboundGreenApiMessageNow(input: InboundGreenApiMessage): Promise<void> {
   const supabase = createAdminClient()
 
@@ -380,6 +502,14 @@ async function processInboundGreenApiMessageNow(input: InboundGreenApiMessage): 
 
   if (await isManagerControllingChat(supabase, input.chatId)) return
   if (await isPhoneBlockedForBot(supabase, input.chatId)) return
+
+  // Картинка от клиента — это чек. Отдельная ветка до общего скрипта: ИИ
+  // картинку не видит и, не зная об оплате, предлагал предоплату уже
+  // оплатившему клиенту.
+  if (botEnabled && IMAGE_TYPES.has(input.messageType ?? '') && input.mediaUrl) {
+    await handleGreenApiReceipt(supabase, input, externalKey)
+    return
+  }
 
   const inboundAction = COMPLAINT.test(input.text) || COOPERATION.test(input.text)
     ? 'non_standard_request'
