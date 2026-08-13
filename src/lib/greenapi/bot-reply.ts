@@ -2,13 +2,17 @@
 // (src/lib/amocrm/bot-reply.ts) на тот же номер, но без amoCRM в цепочке.
 //
 // Тот же мозг (тот же Telegram-бот Smilekit, /internal/lab), тот же скрипт
-// продаж и тот же принцип «наш сервер — мастер истории» — только транспорт
-// (Green API вместо amojo) и таблица истории (bot_messages вместо
-// amocrm_messages, chat_id = телефон вместо amojo chat_id).
+// продаж и тот же принцип «наш сервер — мастер истории» — меняется только
+// транспорт (Green API вместо amojo) и адресация: chat_id здесь — номер
+// телефона, а не внутренний chat_id amoCRM.
+//
+// История лежит в общей amocrm_messages (таблица канало-независимая по
+// набору колонок), id сообщений Green API префиксуются `ga:` — так оба
+// канала живут рядом без отдельной таблицы и миграции.
 //
 // В отличие от amoCRM-канала: Green API отдаёт голосовое сразу с прямой
 // ссылкой в вебхуке — не нужен retry-поиск в «истории чата», её просто нет
-// как отдельного API, вся история — наша же bot_messages.
+// как отдельного API.
 
 import { createAdminClient } from '@/lib/supabase/admin'
 import { smilekitBotFetch } from '@/lib/smilekit-bot-api'
@@ -166,9 +170,8 @@ function stageActionForInbound(text: string): string | null {
 export async function registerOutgoingGreenApiMessage(input: InboundGreenApiMessage): Promise<void> {
   const supabase = createAdminClient()
   const { data: recentBot } = await supabase
-    .from('bot_messages')
+    .from('amocrm_messages')
     .select('id')
-    .eq('provider', 'greenapi')
     .eq('chat_id', input.chatId)
     .eq('sender', 'bot')
     .eq('text', input.text)
@@ -176,17 +179,16 @@ export async function registerOutgoingGreenApiMessage(input: InboundGreenApiMess
     .limit(1)
   if (recentBot?.length) return // эхо нашей же отправки
 
-  await supabase.from('bot_messages').upsert(
+  await supabase.from('amocrm_messages').upsert(
     {
-      provider: 'greenapi',
-      provider_message_id: input.providerMessageId,
+      amo_message_id: `ga:${input.providerMessageId}`,
       chat_id: input.chatId,
       direction: 'out',
       sender: 'operator',
       author_name: input.authorName,
       text: input.text,
     },
-    { onConflict: 'provider,provider_message_id', ignoreDuplicates: true }
+    { onConflict: 'amo_message_id', ignoreDuplicates: true }
   )
 }
 
@@ -199,7 +201,7 @@ async function isManagerControllingChat(
 ): Promise<boolean> {
   const [lastOperatorResult, controlResult] = await Promise.all([
     supabase
-      .from('bot_messages')
+      .from('amocrm_messages')
       .select('created_at')
       .eq('chat_id', chatId)
       .eq('sender', 'operator')
@@ -277,18 +279,17 @@ async function processInboundGreenApiMessageNow(input: InboundGreenApiMessage): 
   if (transcript) input = { ...input, text: transcript }
 
   const { data: inserted, error: insertError } = await supabase
-    .from('bot_messages')
+    .from('amocrm_messages')
     .upsert(
       {
-        provider: 'greenapi',
-        provider_message_id: input.providerMessageId,
+        amo_message_id: `ga:${input.providerMessageId}`,
         chat_id: input.chatId,
         direction: 'in',
         sender: 'client',
         author_name: input.authorName,
         text: input.text,
       },
-      { onConflict: 'provider,provider_message_id', ignoreDuplicates: true }
+      { onConflict: 'amo_message_id', ignoreDuplicates: true }
     )
     .select('id')
   if (insertError) {
@@ -328,7 +329,7 @@ async function processInboundGreenApiMessageNow(input: InboundGreenApiMessage): 
   if (!botEnabled) return
 
   const { data: rows } = await supabase
-    .from('bot_messages')
+    .from('amocrm_messages')
     .select('sender, text, id')
     .eq('chat_id', input.chatId)
     .order('created_at', { ascending: false })
@@ -412,14 +413,13 @@ async function processInboundGreenApiMessageNow(input: InboundGreenApiMessage): 
     if (!(await canSendGreenApiBotReply(supabase, input.chatId))) return
     const text = replies[index]
     const botMessageId = `bot:${input.providerMessageId}:${index}`
-    const { error: reserveError } = await supabase.from('bot_messages').upsert({
-      provider: 'greenapi',
-      provider_message_id: botMessageId,
+    const { error: reserveError } = await supabase.from('amocrm_messages').upsert({
+      amo_message_id: `ga:${botMessageId}`,
       chat_id: input.chatId,
       direction: 'out',
       sender: 'bot',
       text,
-    }, { onConflict: 'provider,provider_message_id', ignoreDuplicates: true })
+    }, { onConflict: 'amo_message_id', ignoreDuplicates: true })
     if (reserveError) {
       console.error('greenapi bot-reply: bot message reserve failed', reserveError.message)
       return
@@ -441,7 +441,7 @@ async function processInboundGreenApiMessageNow(input: InboundGreenApiMessage): 
         await sendGreenApiMessage(chatId, text)
       }
     } catch (error) {
-      await supabase.from('bot_messages').delete().eq('provider', 'greenapi').eq('provider_message_id', botMessageId)
+      await supabase.from('amocrm_messages').delete().eq('amo_message_id', `ga:${botMessageId}`)
       console.error('greenapi bot-reply: send failed', error)
       return
     }
@@ -452,14 +452,13 @@ async function processInboundGreenApiMessageNow(input: InboundGreenApiMessage): 
       for (const [name, caption] of [['before.jpg', 'До'], ['after.jpg', 'После']] as const) {
         if (!(await canSendGreenApiBotReply(supabase, input.chatId))) return
         const photoMessageId = `bot:${input.providerMessageId}:result:${name}`
-        const { error: photoReserveError } = await supabase.from('bot_messages').upsert({
-          provider: 'greenapi',
-          provider_message_id: photoMessageId,
+        const { error: photoReserveError } = await supabase.from('amocrm_messages').upsert({
+          amo_message_id: `ga:${photoMessageId}`,
           chat_id: input.chatId,
           direction: 'out',
           sender: 'bot',
           text: caption,
-        }, { onConflict: 'provider,provider_message_id', ignoreDuplicates: true })
+        }, { onConflict: 'amo_message_id', ignoreDuplicates: true })
         if (photoReserveError) {
           console.error('greenapi bot-reply: result photo reserve failed', photoReserveError.message)
           continue
@@ -472,7 +471,7 @@ async function processInboundGreenApiMessageNow(input: InboundGreenApiMessage): 
             caption,
           })
         } catch (error) {
-          await supabase.from('bot_messages').delete().eq('provider', 'greenapi').eq('provider_message_id', photoMessageId)
+          await supabase.from('amocrm_messages').delete().eq('amo_message_id', `ga:${photoMessageId}`)
           console.error('greenapi bot-reply: result photo send failed', error)
         }
         await new Promise((resolve) => setTimeout(resolve, 700))
