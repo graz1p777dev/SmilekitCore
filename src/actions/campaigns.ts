@@ -81,12 +81,25 @@ export interface LastMessageDateFilter {
   to?: string
 }
 
-async function eligibleRecipients(dateFilter?: LastMessageDateFilter): Promise<Recipient[]> {
+/** Кого включать в рассылку по признаку покупки. */
+export type CampaignAudience = 'not_purchased' | 'purchased' | 'all'
+
+export interface AudienceFilter extends LastMessageDateFilter {
+  audience?: CampaignAudience
+}
+
+async function eligibleRecipients(filter?: AudienceFilter): Promise<Recipient[]> {
   const admin = createAdminClient()
+  const audience: CampaignAudience = filter?.audience ?? 'not_purchased'
+  const dateFilter = filter
+  // Green API шлёт по номеру телефона, amojo — только по внутреннему chat_id
+  // amoCRM. Пока Green API настроен, номера без чата в amoCRM (клиенты, чью
+  // переписку амо не успела синхронизировать) тоже становятся доступны.
+  const greenApiReady = Boolean(process.env.GREENAPI_ID_INSTANCE && process.env.GREENAPI_API_TOKEN_INSTANCE)
   const [deals, { data: orders }, amoMessages, { data: optOuts }] = await Promise.all([
     fetchAllRows<{ id: string; source: string; external_key: string | null; customer_phone: string | null }>(
       admin, 'deals', 'id, source, external_key, customer_phone',
-      (q) => q.neq('status', 'won').is('deleted_at', null).order('id')
+      (q) => (audience === 'all' ? q : q.neq('status', 'won')).is('deleted_at', null).order('id')
     ),
     admin
       .from('orders')
@@ -146,7 +159,9 @@ async function eligibleRecipients(dateFilter?: LastMessageDateFilter): Promise<R
   return (deals ?? []).flatMap((deal): Recipient[] => {
     const id = String(deal.id)
     const key = String(deal.external_key || '')
-    if (!key || purchased.has(id)) return []
+    if (!key) return []
+    if (audience === 'not_purchased' && purchased.has(id)) return []
+    if (audience === 'purchased' && !purchased.has(id)) return []
     if (excludedPhones.has(normalizePhone(deal.customer_phone))) return []
     if (deal.source === 'telegram' && key.startsWith('telegram:')) {
       if (fromTime || toTime) return [] // фильтр по дате пока считаем только для WhatsApp-канала
@@ -167,7 +182,10 @@ async function eligibleRecipients(dateFilter?: LastMessageDateFilter): Promise<R
       // же campaign_recipients требует конкретное значение, не 'amocrm'.
       const leadId = key.slice('amocrm:'.length)
       const chat = amoByLead.get(leadId)
-      if (!chat || managerChats.has(chat.chatId)) return []
+      const phone = normalizePhone(deal.customer_phone)
+      // Без чата в amoCRM отправить можно только через Green API (по номеру).
+      if (!chat && !(greenApiReady && phone.length >= 9)) return []
+      if (chat && managerChats.has(chat.chatId)) return []
       if (fromTime || toTime) {
         const lastAt = lastClientMessageAtByLead.get(leadId)
         if (!lastAt) return []
@@ -179,9 +197,11 @@ async function eligibleRecipients(dateFilter?: LastMessageDateFilter): Promise<R
         deal_id: id,
         channel: 'whatsapp',
         external_key: key,
-        chat_id: chat.chatId,
+        // Green API адресует по номеру, amojo — по chat_id. Планировщик
+        // различает их по формату (см. scheduler.ts): только цифры — номер.
+        chat_id: greenApiReady && phone.length >= 9 ? phone : chat!.chatId,
         lead_id: leadId,
-        contact_id: chat.contactId,
+        contact_id: chat?.contactId ?? null,
       }]
     }
     return []
@@ -200,11 +220,19 @@ export async function getCampaignsData(): Promise<CampaignsData> {
   return { campaigns: (data ?? []) as CampaignRow[], eligibleCount: recipients.length, optOuts }
 }
 
-/** Живой пересчёт аудитории под введённые вручную даты (для UI, до создания рассылки). */
-export async function getEligibleCountForRange(dateFrom?: string, dateTo?: string): Promise<number> {
+/** Живой пересчёт аудитории под выбранные фильтры (для UI, до создания рассылки). */
+export async function getEligibleCountForRange(
+  dateFrom?: string,
+  dateTo?: string,
+  audience?: CampaignAudience
+): Promise<number> {
   const me = await viewer()
   if (!me || !['owner', 'rop'].includes(me.role)) return 0
-  const recipients = await eligibleRecipients({ from: dateFrom || undefined, to: dateTo || undefined })
+  const recipients = await eligibleRecipients({
+    from: dateFrom || undefined,
+    to: dateTo || undefined,
+    audience,
+  })
   return recipients.length
 }
 
@@ -214,6 +242,7 @@ const CampaignSchema = z.object({
   scheduledAt: z.string().datetime(),
   dateFrom: z.string().optional(),
   dateTo: z.string().optional(),
+  audience: z.enum(['not_purchased', 'purchased', 'all']).optional(),
 })
 
 export async function scheduleCampaign(input: unknown): Promise<{ success: true; count: number } | { success: false; error: string }> {
@@ -223,8 +252,12 @@ export async function scheduleCampaign(input: unknown): Promise<{ success: true;
   if (!parsed.success) return { success: false, error: 'Заполните название, сообщение и время отправки' }
   const scheduledAt = new Date(parsed.data.scheduledAt)
   if (scheduledAt.getTime() < Date.now() - 60_000) return { success: false, error: 'Время отправки уже прошло' }
-  const recipients = await eligibleRecipients({ from: parsed.data.dateFrom, to: parsed.data.dateTo })
-  if (!recipients.length) return { success: false, error: 'Нет доступных клиентов без покупки за выбранный период' }
+  const recipients = await eligibleRecipients({
+    from: parsed.data.dateFrom,
+    to: parsed.data.dateTo,
+    audience: parsed.data.audience,
+  })
+  if (!recipients.length) return { success: false, error: 'Нет клиентов под выбранные фильтры' }
 
   const admin = createAdminClient()
   const { data: campaign, error } = await admin.from('campaigns').insert({

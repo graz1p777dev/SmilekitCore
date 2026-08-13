@@ -10,6 +10,7 @@ import {
   getEligibleCountForRange,
   removeOptOutPhone,
   scheduleCampaign,
+  type CampaignAudience,
   type CampaignsData,
   type CampaignRow,
 } from '@/actions/campaigns'
@@ -48,6 +49,7 @@ export default function CampaignsClient({ initialData }: { initialData: Campaign
   const [scheduledAt, setScheduledAt] = useState(defaultSchedule)
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
+  const [audience, setAudience] = useState<CampaignAudience>('not_purchased')
   const [eligibleCount, setEligibleCount] = useState(initialData.eligibleCount)
   const [countLoading, setCountLoading] = useState(false)
   const [optOutPhone, setOptOutPhone] = useState('')
@@ -63,18 +65,18 @@ export default function CampaignsClient({ initialData }: { initialData: Campaign
   // сообщение клиента от … до …» — без диапазона используется дефолтное
   // значение с сервера (initialData.eligibleCount).
   useEffect(() => {
-    if (!dateFrom && !dateTo) {
+    if (!dateFrom && !dateTo && audience === 'not_purchased') {
       setEligibleCount(initialData.eligibleCount)
       return
     }
     setCountLoading(true)
     const timer = setTimeout(() => {
-      getEligibleCountForRange(dateFrom || undefined, dateTo || undefined)
+      getEligibleCountForRange(dateFrom || undefined, dateTo || undefined, audience)
         .then(setEligibleCount)
         .finally(() => setCountLoading(false))
     }, 400)
     return () => clearTimeout(timer)
-  }, [dateFrom, dateTo, initialData.eligibleCount])
+  }, [dateFrom, dateTo, audience, initialData.eligibleCount])
 
   const scheduleLabel = useMemo(() => {
     const date = new Date(scheduledAt)
@@ -89,6 +91,7 @@ export default function CampaignsClient({ initialData }: { initialData: Campaign
         scheduledAt: new Date(scheduledAt).toISOString(),
         dateFrom: dateFrom || undefined,
         dateTo: dateTo || undefined,
+        audience,
       })
       if (!result.success) {
         toast.error(result.error)
@@ -100,6 +103,7 @@ export default function CampaignsClient({ initialData }: { initialData: Campaign
       setScheduledAt(defaultSchedule())
       setDateFrom('')
       setDateTo('')
+      setAudience('not_purchased')
       router.refresh()
     })
   }
@@ -180,6 +184,26 @@ export default function CampaignsClient({ initialData }: { initialData: Campaign
                 <Input id="campaign-time" type="datetime-local" value={scheduledAt} onChange={(event) => setScheduledAt(event.target.value)} />
               </div>
               <div className="space-y-2">
+                <Label>Кому отправлять</Label>
+                <div className="flex flex-wrap gap-2">
+                  {([
+                    ['not_purchased', 'Кто не купил'],
+                    ['purchased', 'Кто купил'],
+                    ['all', 'Всем'],
+                  ] as const).map(([value, label]) => (
+                    <Button
+                      key={value}
+                      type="button"
+                      size="sm"
+                      variant={audience === value ? 'default' : 'outline'}
+                      onClick={() => setAudience(value)}
+                    >
+                      {label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-2">
                 <Label>Последнее сообщение клиента — период (необязательно)</Label>
                 <div className="flex items-center gap-2">
                   <Input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} aria-label="От даты" />
@@ -208,7 +232,11 @@ export default function CampaignsClient({ initialData }: { initialData: Campaign
                 <strong className="text-5xl leading-none tabular-nums" style={{ opacity: countLoading ? 0.5 : 1 }}>{eligibleCount}</strong>
                 <span className="pb-1 text-sm text-white/70">клиентов</span>
               </div>
-              <p className="mt-3 text-sm leading-relaxed text-white/75">Сделки без оплаченного заказа в Telegram, WhatsApp и Instagram.</p>
+              <p className="mt-3 text-sm leading-relaxed text-white/75">
+                {audience === 'not_purchased' && 'Сделки без оплаченного заказа.'}
+                {audience === 'purchased' && 'Клиенты с оплаченным заказом.'}
+                {audience === 'all' && 'Все клиенты — и купившие, и нет.'}
+              </p>
             </div>
             <div className="border-y border-white/10 bg-white/[.06] p-6">
               <div className="flex gap-3"><Clock3 className="mt-0.5 size-4 shrink-0 text-violet-200" /><div><p className="text-xs text-white/55">Отправка</p><p className="mt-1 text-sm font-semibold">{scheduleLabel}</p></div></div>

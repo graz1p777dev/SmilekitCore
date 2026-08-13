@@ -1,9 +1,14 @@
 import { sendAmoChatMessage } from '@/lib/amocrm/chat'
+import { sendGreenApiMessage, toGreenApiChatId } from '@/lib/greenapi/client'
 import { smilekitBotFetch } from '@/lib/smilekit-bot-api'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 const POLL_INTERVAL_MS = 30_000
-const SEND_INTERVAL_MS = 1_000
+// Green API — это мост к WhatsApp Web, а не официальный Business API: слишком
+// плотная массовая отправка с одного номера повышает риск блокировки самим
+// WhatsApp. 3 секунды между сообщениями — компромисс между скоростью и риском
+// (1000 адресатов ≈ 50 минут).
+const SEND_INTERVAL_MS = 3_000
 let started = false
 
 type Campaign = { id: string; message: string }
@@ -54,6 +59,13 @@ async function send(recipient: Recipient, campaign: Campaign) {
     sender: 'bot',
     text: campaign.message,
   }, { onConflict: 'amo_message_id', ignoreDuplicates: true })
+  // Только цифры в chat_id — это номер телефона, значит адресат подобран под
+  // Green API (см. eligibleRecipients). UUID-подобный chat_id — старый путь
+  // через amojo для чатов, у которых есть переписка в amoCRM.
+  if (/^\d{9,}$/.test(recipient.chat_id)) {
+    await sendGreenApiMessage(toGreenApiChatId(recipient.chat_id), campaign.message)
+    return
+  }
   await sendAmoChatMessage({
     chatId: recipient.chat_id,
     leadId: recipient.lead_id,
