@@ -137,6 +137,18 @@ function shouldSendResultsAfterLocation(text: string, historyText: string): bool
 const ORDER_INTENT =
   /хочу\s+(?:заказать|купить|взять)|(?:как|где)\s+(?:заказать|купить|оформить)|закажу|заказать|оформить|оформляйте|оформляем|\bберу\b|возьму|можно\s+оформить|реквизит|куда\s+(?:скинуть|перевести|оплатить|платить)|как\s+оплатить|способ\s+оплаты|\bqr[\s-]?код/i
 
+// Подводка перед фото — дословно как в Telegram (__main__.py).
+const RESULTS_INTRO = 'Вот результат нашего клиента до и после применения 👇'
+
+// Тот же набор, что уходит альбомом в Telegram (media.result_photo_group).
+// WhatsApp альбомов не поддерживает — шлём по одному; подписи «До»/«После»
+// нужны, потому что без album-группировки порядок иначе не читается.
+const RESULT_PHOTOS: readonly (readonly [string, string])[] = [
+  ['before.jpg', 'До'],
+  ['after.jpg', 'После'],
+  ['resultotzyv.jpeg', ''],
+]
+
 const SMILEKIT_RESULTS_URL = 'https://smilekit.vercel.app/#results'
 
 const DOUBT_RESULT_REPLY =
@@ -237,6 +249,36 @@ async function isPhoneBlockedForBot(
     .eq('block_bot_replies', true)
     .maybeSingle()
   return Boolean(data)
+}
+
+/**
+ * Разрешает отправку фото результатов ровно один раз за чат — порт
+ * storage.claim_event из Telegram-бота. Маркер живёт в той же таблице
+ * истории: UNIQUE(amo_message_id) делает захват атомарным, повторный вызов
+ * ничего не вставит и вернёт false.
+ */
+async function claimResultPhotos(
+  supabase: ReturnType<typeof createAdminClient>,
+  chatId: string
+): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('amocrm_messages')
+    .upsert(
+      {
+        amo_message_id: `ga:claim:results:${chatId}`,
+        chat_id: chatId,
+        direction: 'out',
+        sender: 'bot',
+        text: '[фото до/после]',
+      },
+      { onConflict: 'amo_message_id', ignoreDuplicates: true }
+    )
+    .select('id')
+  if (error) {
+    console.error('greenapi bot-reply: results claim failed', error.message)
+    return false
+  }
+  return Boolean(data?.length)
 }
 
 async function canSendGreenApiBotReply(
@@ -445,11 +487,16 @@ async function processInboundGreenApiMessageNow(input: InboundGreenApiMessage): 
       console.error('greenapi bot-reply: send failed', error)
       return
     }
-    // Фото до/после — сразу после первой реплики, как в Telegram. Green API
-    // шлёт настоящие картинки по ссылке (sendFileByUrl), поэтому здесь не
-    // нужен обходной путь со ссылкой на сайт, как в amoCRM-канале.
-    if (sendResultPhotos && index === 0 && mediaBaseUrl) {
-      for (const [name, caption] of [['before.jpg', 'До'], ['after.jpg', 'После']] as const) {
+    // Фото результатов — сразу после первой реплики, как в Telegram
+    // (__main__.py: подводка -> send_media_group -> голосовое -> CTA).
+    // Ровно один раз за чат: shouldSendResultsAfterLocation срабатывает на
+    // каждый короткий ответ клиента, и без этой защиты бот присылал фото
+    // снова и снова. В Telegram ту же роль играет storage.claim_event.
+    if (sendResultPhotos && index === 0 && mediaBaseUrl && await claimResultPhotos(supabase, input.chatId)) {
+      await sendGreenApiMessage(chatId, RESULTS_INTRO).catch((error) =>
+        console.error('greenapi bot-reply: results intro failed', error)
+      )
+      for (const [name, caption] of RESULT_PHOTOS) {
         if (!(await canSendGreenApiBotReply(supabase, input.chatId))) return
         const photoMessageId = `bot:${input.providerMessageId}:result:${name}`
         const { error: photoReserveError } = await supabase.from('amocrm_messages').upsert({
@@ -457,7 +504,7 @@ async function processInboundGreenApiMessageNow(input: InboundGreenApiMessage): 
           chat_id: input.chatId,
           direction: 'out',
           sender: 'bot',
-          text: caption,
+          text: caption || '[фото результата]',
         }, { onConflict: 'amo_message_id', ignoreDuplicates: true })
         if (photoReserveError) {
           console.error('greenapi bot-reply: result photo reserve failed', photoReserveError.message)
@@ -468,7 +515,7 @@ async function processInboundGreenApiMessageNow(input: InboundGreenApiMessage): 
             chatId,
             urlFile: `${mediaBaseUrl}/media/results/${name}`,
             fileName: name,
-            caption,
+            caption: caption || undefined,
           })
         } catch (error) {
           await supabase.from('amocrm_messages').delete().eq('amo_message_id', `ga:${photoMessageId}`)
