@@ -252,12 +252,12 @@ async function isPhoneBlockedForBot(
 }
 
 /**
- * Разрешает отправку фото результатов ровно один раз за чат — порт
- * storage.claim_event из Telegram-бота. Маркер живёт в той же таблице
- * истории: UNIQUE(amo_message_id) делает захват атомарным, повторный вызов
- * ничего не вставит и вернёт false.
+ * Разрешает блок «после города» (доставка, фото, голосовое, CTA) ровно один
+ * раз за чат — порт storage.claim_event из Telegram-бота. Маркер живёт в той
+ * же таблице истории: UNIQUE(amo_message_id) делает захват атомарным,
+ * повторный вызов ничего не вставит и вернёт false.
  */
-async function claimResultPhotos(
+async function claimResultsBlock(
   supabase: ReturnType<typeof createAdminClient>,
   chatId: string
 ): Promise<boolean> {
@@ -411,9 +411,19 @@ async function processInboundGreenApiMessageNow(input: InboundGreenApiMessage): 
   // Голосовые — как в Telegram: озвучиваем те же две реплики заранее
   // записанными файлами (assets/voice в боте), текст остаётся тем же.
   const voiceReplies = new Set<string>()
-  let sendResultPhotos = shouldSendResultsAfterLocation(input.text, historyText)
   let stageAction: string | null = null
   const deliveryTemplate = deliveryTemplateForCity(input.text)
+  const priceKnown = historyText.includes('цена') || historyText.includes('сом')
+
+  // Блок «после города» (доставка + фото + голосовое + CTA) уходит ровно один
+  // раз за чат — как claim_event в Telegram. Условия-триггеры остаются
+  // верными и дальше по диалогу: название города всплывает в адресе, а любой
+  // короткий ответ проходит shouldSendResultsAfterLocation. Без общей
+  // защиты бот повторял голосовое «эффект с первого раза» уже во время
+  // оформления заказа — не к месту.
+  const wantsResultsBlock =
+    shouldSendResultsAfterLocation(input.text, historyText) || Boolean(deliveryTemplate && priceKnown)
+  const resultsBlockAllowed = wantsResultsBlock ? await claimResultsBlock(supabase, input.chatId) : false
 
   if (history.length > 0 && GREETING_ONLY.test(input.text)) {
     replies.push(
@@ -437,10 +447,9 @@ async function processInboundGreenApiMessageNow(input: InboundGreenApiMessage): 
   } else if (ORDER_INTENT.test(input.text)) {
     replies.push(ORDER_CHECKLIST)
     stageAction = 'order'
-  } else if (deliveryTemplate && (historyText.includes('цена') || historyText.includes('сом'))) {
+  } else if (deliveryTemplate && priceKnown && resultsBlockAllowed) {
     replies.push(deliveryTemplate, FIRST_USE_EFFECT)
     replies.push(historyText.includes('скидк') ? 'Оформить вам? Пока есть в наличии.' : LOW_STOCK_DISCOUNT_CTA)
-    sendResultPhotos = true
     voiceReplies.add(FIRST_USE_EFFECT)
   }
 
@@ -511,7 +520,7 @@ async function processInboundGreenApiMessageNow(input: InboundGreenApiMessage): 
     // Ровно один раз за чат: shouldSendResultsAfterLocation срабатывает на
     // каждый короткий ответ клиента, и без этой защиты бот присылал фото
     // снова и снова. В Telegram ту же роль играет storage.claim_event.
-    if (sendResultPhotos && index === 0 && mediaBaseUrl && await claimResultPhotos(supabase, input.chatId)) {
+    if (resultsBlockAllowed && index === 0 && mediaBaseUrl) {
       // Запись бота ДО отправки обязательна для любого исходящего: эхо из
       // вебхука Green API ищет свежую строку sender='bot' с тем же текстом,
       // и без неё подводка опозналась бы как сообщение менеджера — бот
