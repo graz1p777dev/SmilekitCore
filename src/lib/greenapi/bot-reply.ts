@@ -281,10 +281,25 @@ async function claimResultPhotos(
   return Boolean(data?.length)
 }
 
+/**
+ * Обкатка на своих номерах: пока GREENAPI_ALLOWED_PHONES не пуст, бот
+ * отвечает только перечисленным номерам (через запятую, только цифры).
+ * Остальным клиентам история и сделки ведутся как обычно, но ответов нет.
+ * Пустая переменная — обычный режим, отвечаем всем.
+ */
+function isPhoneAllowedForBot(chatId: string): boolean {
+  const allowed = (process.env.GREENAPI_ALLOWED_PHONES ?? '')
+    .split(',')
+    .map((value) => value.replace(/\D/g, ''))
+    .filter(Boolean)
+  return allowed.length === 0 || allowed.includes(chatId.replace(/\D/g, ''))
+}
+
 async function canSendGreenApiBotReply(
   supabase: ReturnType<typeof createAdminClient>,
   chatId: string
 ): Promise<boolean> {
+  if (!isPhoneAllowedForBot(chatId)) return false
   // Общий с amoCRM-каналом аварийный выключатель (integrations.amoCRM) —
   // это переключатель «бот продаж SmileKit включён», а не именно amoCRM.
   const [integrationResult, managerControls] = await Promise.all([
@@ -369,6 +384,10 @@ async function processInboundGreenApiMessageNow(input: InboundGreenApiMessage): 
   }
 
   if (!botEnabled) return
+  // Ранний выход до генерации ответа: иначе на каждое сообщение постороннего
+  // клиента впустую тратился бы вызов ИИ, а отправку всё равно отсечёт
+  // canSendGreenApiBotReply.
+  if (!isPhoneAllowedForBot(input.chatId)) return
 
   const { data: rows } = await supabase
     .from('amocrm_messages')
