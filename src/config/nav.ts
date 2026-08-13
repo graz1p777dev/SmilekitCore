@@ -99,6 +99,12 @@ export const NAV_GROUPS: NavGroup[] = [
         roles: ['owner'],
       },
       {
+        href: '/dashboard/whatsapp-settings',
+        label: 'WhatsApp: шаблоны и доставка',
+        icon: SlidersHorizontal,
+        roles: ['owner'],
+      },
+      {
         href: '/dashboard/laboratory',
         label: 'Лаборатория',
         icon: FlaskConical,

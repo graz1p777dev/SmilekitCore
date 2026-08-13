@@ -19,7 +19,13 @@ import { smilekitBotFetch } from '@/lib/smilekit-bot-api'
 import { upsertDealFromInbound } from '@/lib/deals/auto-create'
 import { advanceDealFromBotAction } from '@/lib/deals/advance-stage'
 import { ingestOrder } from '@/lib/orders/ingest'
-import { sendGreenApiFileByUrl, sendGreenApiMessage, sendGreenApiVoice } from '@/lib/greenapi/client'
+import { decrementStock, getWhatsappBotConfig } from '@/lib/greenapi/config'
+import {
+  sendGreenApiDeliveryGroupFile,
+  sendGreenApiFileByUrl,
+  sendGreenApiMessage,
+  sendGreenApiVoice,
+} from '@/lib/greenapi/client'
 import { createLimiter } from '@/lib/concurrency-limit'
 
 export interface InboundGreenApiMessage {
@@ -512,6 +518,48 @@ async function handleGreenApiReceipt(
     console.error('greenapi bot-reply: delivery push failed', error)
   }
 
+  const botConfig = await getWhatsappBotConfig()
+  if (botConfig.deliveryGroupId) {
+    // Промпт из настроек — свободный текст, {name}/{phone}/{address} заменяются
+    // значениями заказа. Без промпта — тот же формат, что уходит в Telegram.
+    const caption = (botConfig.deliveryPrompt || 'Новый заказ ({name}, {phone})\nАдрес: {address}')
+      .replaceAll('{name}', input.authorName || '—')
+      .replaceAll('{phone}', input.chatId)
+      .replaceAll('{address}', input.text || '—')
+    try {
+      await sendGreenApiDeliveryGroupFile(botConfig.deliveryGroupId, {
+        urlFile: input.mediaUrl!,
+        fileName: 'receipt.jpg',
+        caption,
+      })
+    } catch (error) {
+      console.error('greenapi bot-reply: whatsapp delivery group push failed', error)
+    }
+  }
+
+  // Товароучёт: коробка отгружается только на подтверждённый чек — реакция
+  // ставится в переписке вручную и её не видно через Green API (вебхуки
+  // Green API не отдают события реакций, см. заметку в передаче), поэтому
+  // триггером служит уже существующая проверка чека, а не лайк.
+  if (verified) await decrementStock(1)
+
+  for (const hook of botConfig.outboundWebhooks) {
+    fetch(hook.url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        event: 'order.created',
+        channel: 'whatsapp',
+        verified,
+        customerName: input.authorName,
+        customerPhone: input.chatId,
+        address: input.text || null,
+        receiptUrl: input.mediaUrl,
+      }),
+      signal: AbortSignal.timeout(10_000),
+    }).catch((error) => console.error(`greenapi bot-reply: outbound webhook ${hook.name} failed`, error))
+  }
+
   const advanced = await advanceDealFromBotAction(externalKey, 'order')
   if (!advanced.ok && advanced.error) {
     console.error('greenapi bot-reply: stage advance failed', 'order', advanced.error)
@@ -633,6 +681,19 @@ async function processInboundGreenApiMessageNow(input: InboundGreenApiMessage): 
   const lastBotMessage = [...history].reverse().find((item) => item.role === 'assistant')?.content ?? ''
   const acceptedOrderCta = AFFIRMATIVE_ONLY.test(input.text) && ORDER_CTA_MARKER.test(lastBotMessage)
 
+  // Тексты, редактируемые из CRM («Настройки бота» → «Шаблоны») — пустая
+  // строка в настройках означает «не переопределено», используем дефолт.
+  const botConfig = await getWhatsappBotConfig()
+  const T = {
+    productInfo: botConfig.templates.productInfo || PRODUCT_INFO,
+    orderChecklist: botConfig.templates.orderChecklist || ORDER_CHECKLIST,
+    doubtResult: botConfig.templates.doubtResult || DOUBT_RESULT_REPLY,
+    firstUseEffect: botConfig.templates.firstUseEffect || FIRST_USE_EFFECT,
+    lowStockCta: botConfig.templates.lowStockCta || LOW_STOCK_DISCOUNT_CTA,
+    complaintPrompt: botConfig.templates.complaintPrompt || COMPLAINT_PROMPT,
+    cooperationReply: botConfig.templates.cooperationReply || COOPERATION_REPLY,
+  }
+
   if (history.length > 0 && GREETING_ONLY.test(input.text)) {
     replies.push(
       isKyrgyz
@@ -640,30 +701,30 @@ async function processInboundGreenApiMessageNow(input: InboundGreenApiMessage): 
         : RETURNING_GREETING_REPLIES[Math.floor(Math.random() * RETURNING_GREETING_REPLIES.length)]
     )
   } else if (LINK_IN_MESSAGE.test(input.text) || GREETING_ONLY.test(input.text)) {
-    replies.push(PRODUCT_INFO, CITY_QUESTION)
+    replies.push(T.productInfo, CITY_QUESTION)
   } else if (isKyrgyz && KYRGYZ_PRICE_INTENT.test(input.text)) {
     replies.push(KYRGYZ_PRODUCT_INFO)
   } else if (history.length === 0) {
-    replies.push(PRODUCT_INFO, CITY_QUESTION)
+    replies.push(T.productInfo, CITY_QUESTION)
   } else if (SCAM_DOUBT.test(input.text)) {
-    replies.push(DOUBT_RESULT_REPLY)
-    voiceReplies.add(DOUBT_RESULT_REPLY)
+    replies.push(T.doubtResult)
+    voiceReplies.add(T.doubtResult)
   } else if (COMPLAINT.test(input.text)) {
-    replies.push(COMPLAINT_PROMPT)
+    replies.push(T.complaintPrompt)
   } else if (COOPERATION.test(input.text)) {
-    replies.push(COOPERATION_REPLY)
+    replies.push(T.cooperationReply)
   } else if (ORDER_INTENT.test(input.text) || acceptedOrderCta) {
     // QR отправляется сразу вместе с чек-листом (ниже, sendPaymentQr) — раньше
     // WhatsApp не умел слать картинки, поэтому клиента отправляли к менеджеру
     // за реквизитами. Green API картинки шлёт, так что ждать «подтверждения»
     // перед выдачей реквизитов больше не нужно.
-    replies.push(ORDER_CHECKLIST)
+    replies.push(T.orderChecklist)
     sendPaymentQr = true
     stageAction = 'order'
   } else if (deliveryTemplate && priceKnown && resultsBlockAllowed) {
-    replies.push(deliveryTemplate, FIRST_USE_EFFECT)
-    replies.push(historyText.includes('скидк') ? 'Оформить вам? Пока есть в наличии.' : LOW_STOCK_DISCOUNT_CTA)
-    voiceReplies.add(FIRST_USE_EFFECT)
+    replies.push(deliveryTemplate, T.firstUseEffect)
+    replies.push(historyText.includes('скидк') ? 'Оформить вам? Пока есть в наличии.' : T.lowStockCta)
+    voiceReplies.add(T.firstUseEffect)
   }
 
   if (replies.length === 0) {
@@ -712,7 +773,7 @@ async function processInboundGreenApiMessageNow(input: InboundGreenApiMessage): 
       // Green API рендерит голосовой «пузырь» только для .ogg/Opus, поэтому
       // при любой ошибке откатываемся на текст, чтобы клиент не остался без
       // ответа.
-      const voiceName = text === FIRST_USE_EFFECT ? 'first_use_effect.ogg' : 'not_scam.ogg'
+      const voiceName = text === T.firstUseEffect ? 'first_use_effect.ogg' : 'not_scam.ogg'
       if (voiceReplies.has(text) && mediaBaseUrl) {
         try {
           await sendGreenApiVoice(chatId, `${mediaBaseUrl}/media/voice/${voiceName}`, voiceName)

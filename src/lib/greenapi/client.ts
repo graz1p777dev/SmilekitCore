@@ -105,21 +105,34 @@ export function toGreenApiGroupChatId(groupId: string): string {
 }
 
 /**
- * Отправка в группу WhatsApp (например «Доставки»). Группа берётся из
- * GREENAPI_DELIVERY_GROUP_ID; пока переменная не задана — функция ничего не
- * шлёт и возвращает false, чтобы включение было осознанным действием.
+ * Отправка в группу WhatsApp (например «Доставки»). groupId — id из настроек
+ * CRM («Настройки бота» → «Группа доставки»); пока не выбран — функция
+ * ничего не шлёт и возвращает false, чтобы включение было осознанным
+ * действием, а не побочным эффектом присвоения переменной окружения.
  */
-export async function sendGreenApiDeliveryGroup(text: string): Promise<boolean> {
-  const groupId = process.env.GREENAPI_DELIVERY_GROUP_ID
+export async function sendGreenApiDeliveryGroup(groupId: string | null, text: string): Promise<boolean> {
   if (!groupId) return false
   await sendGreenApiMessage(toGreenApiGroupChatId(groupId), text)
   return true
 }
 
 /** То же для файла — чек/фото заказа в группу. */
-export async function sendGreenApiDeliveryGroupFile(input: Omit<SendGreenApiFileInput, 'chatId'>): Promise<boolean> {
-  const groupId = process.env.GREENAPI_DELIVERY_GROUP_ID
+export async function sendGreenApiDeliveryGroupFile(
+  groupId: string | null,
+  input: Omit<SendGreenApiFileInput, 'chatId'>
+): Promise<boolean> {
   if (!groupId) return false
   await sendGreenApiFileByUrl({ ...input, chatId: toGreenApiGroupChatId(groupId) })
   return true
+}
+
+export interface GreenApiGroup {
+  id: string
+  name: string
+}
+
+/** Список групп WhatsApp этого номера — для выбора группы доставки в CRM. */
+export async function listGreenApiGroups(): Promise<GreenApiGroup[]> {
+  const contacts = await callApi<{ id: string; name?: string }[]>('getContacts')
+  return contacts.filter((c) => c.id?.endsWith('@g.us')).map((c) => ({ id: c.id, name: c.name || c.id }))
 }
