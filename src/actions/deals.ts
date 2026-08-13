@@ -13,6 +13,8 @@ import { shopFetch, isShopConfigured } from '@/lib/shop-api'
 import { upsertDealFromInbound } from '@/lib/deals/auto-create'
 import { syncAmoChatHistory } from '@/lib/amocrm/history'
 import { getAmoChatControlStatus, setAmoChatBotEnabled } from '@/lib/amocrm/bot-reply'
+import { sendAmoChatMessage } from '@/lib/amocrm/chat'
+import { sendGreenApiMessage, toGreenApiChatId } from '@/lib/greenapi/client'
 import type {
   Deal,
   DealEmployee,
@@ -364,6 +366,30 @@ export interface DealConversation {
   note: string | null
 }
 
+// Ссылка на вложение (чек, фото) хранится маркером в конце text — отдельной
+// колонки под медиа в amocrm_messages нет (см. src/lib/greenapi/bot-reply.ts).
+const MEDIA_MARKER = /\n\[media\](\S+)$/
+
+function toDealMessages(rows: {
+  id: number
+  direction: 'in' | 'out'
+  sender: 'client' | 'bot' | 'operator'
+  text: string
+  created_at: string
+}[] | null): DealMessage[] {
+  return (rows ?? []).map((row) => {
+    const media = row.text.match(MEDIA_MARKER)
+    return {
+      id: String(row.id),
+      direction: row.direction,
+      sender: row.sender,
+      text: media ? row.text.slice(0, media.index) : row.text,
+      created_at: row.created_at,
+      media_url: media?.[1] ?? null,
+    }
+  })
+}
+
 /**
  * Читаемая расшифровка диалога: для сделок с витрины — её диалог,
  * для сделок Wazzup — whatsapp_messages. Только чтение.
@@ -377,6 +403,82 @@ export interface DealConversation {
 // зависать на неопределённое время, упираясь в жёсткий клиентский
 // тайм-аут (12с, DealModal.tsx) без осмысленного сообщения. Жёсткий
 // потолок на всю функцию гарантирует быстрый и понятный ответ всегда.
+/**
+ * Менеджер пишет клиенту прямо из карточки сделки — работает для WhatsApp
+ * (amoCRM-канал и Green API) одинаково. Записываем как sender='operator' ДО
+ * отправки: это тот же сигнал «менеджер ведёт чат», что и обычное сообщение
+ * из мессенджера (см. isManagerControllingChat) — бот сразу перестаёт отвечать
+ * в этом чате, второй раз включать тумблер вручную не нужно.
+ */
+export async function sendDealMessage(dealId: string, text: string): Promise<DealActionResult> {
+  const me = await getViewer()
+  if (!me) return { success: false, error: 'Нет авторизации' }
+  const trimmed = text.trim()
+  if (!trimmed) return { success: false, error: 'Пустое сообщение' }
+
+  const admin = createAdminClient()
+  const { data: deal } = await admin
+    .from('deals')
+    .select('external_key')
+    .eq('id', dealId)
+    .maybeSingle()
+  const externalKey = (deal as { external_key: string | null } | null)?.external_key
+  if (!externalKey) return { success: false, error: 'У сделки нет привязанного чата' }
+
+  const messageId = `manager:${dealId}:${Date.now()}`
+
+  if (externalKey.startsWith('greenapi:')) {
+    const phone = externalKey.slice('greenapi:'.length)
+    await admin.from('amocrm_messages').insert({
+      amo_message_id: `ga:${messageId}`,
+      chat_id: phone,
+      direction: 'out',
+      sender: 'operator',
+      author_name: me.name,
+      text: trimmed,
+    })
+    try {
+      await sendGreenApiMessage(toGreenApiChatId(phone), trimmed)
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Не удалось отправить' }
+    }
+    revalidatePath('/dashboard/deals')
+    return { success: true }
+  }
+
+  if (externalKey.startsWith('amocrm:')) {
+    const leadId = externalKey.slice('amocrm:'.length)
+    const { data: chatRow } = await admin
+      .from('amocrm_messages')
+      .select('chat_id, contact_id')
+      .eq('lead_id', leadId)
+      .order('id', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    const chat = chatRow as { chat_id: string; contact_id: string | null } | null
+    if (!chat) return { success: false, error: 'Чат ещё не начался — нет истории amoCRM' }
+    await admin.from('amocrm_messages').insert({
+      amo_message_id: messageId,
+      chat_id: chat.chat_id,
+      lead_id: leadId,
+      contact_id: chat.contact_id,
+      direction: 'out',
+      sender: 'operator',
+      author_name: me.name,
+      text: trimmed,
+    })
+    try {
+      await sendAmoChatMessage({ chatId: chat.chat_id, leadId, contactId: chat.contact_id, text: trimmed })
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Не удалось отправить' }
+    }
+    revalidatePath('/dashboard/deals')
+    return { success: true }
+  }
+
+  return { success: false, error: 'Канал сделки не поддерживает отправку из CRM' }
+}
+
 export async function getDealConversation(dealId: string): Promise<DealConversation> {
   const timedOut = Symbol('timeout')
   const result = await Promise.race([
@@ -402,6 +504,22 @@ async function loadDealConversation(dealId: string): Promise<DealConversation> {
     .maybeSingle()
   const deal = data as { external_key: string | null; customer_phone: string | null } | null
   if (!deal) return { messages: [], note: 'Сделка недоступна' }
+
+  if (deal.external_key?.startsWith('greenapi:')) {
+    // WhatsApp через Green API: chat_id — номер телефона, история в той же
+    // amocrm_messages (см. src/lib/greenapi/bot-reply.ts).
+    const phone = deal.external_key.slice('greenapi:'.length)
+    const admin = createAdminClient()
+    const { data: rows } = await admin
+      .from('amocrm_messages')
+      .select('id, direction, sender, text, created_at')
+      .eq('chat_id', phone)
+      .order('created_at')
+      .order('id')
+      .limit(200)
+    const messages = toDealMessages(rows)
+    return { messages, note: messages.length ? null : 'Сообщений пока нет' }
+  }
 
   if (deal.external_key?.startsWith('wazzup:')) {
     const phone = deal.external_key.slice('wazzup:'.length)
@@ -467,19 +585,7 @@ async function loadDealConversation(dealId: string): Promise<DealConversation> {
         }
       }
     }
-    const messages: DealMessage[] = ((rows ?? []) as {
-      id: number
-      direction: 'in' | 'out'
-      sender: 'client' | 'bot' | 'operator'
-      text: string
-      created_at: string
-    }[]).map((row) => ({
-      id: String(row.id),
-      direction: row.direction,
-      sender: row.sender,
-      text: row.text,
-      created_at: row.created_at,
-    }))
+    const messages = toDealMessages(rows)
     return { messages, note: messages.length ? null : 'Сообщений пока нет' }
   }
 

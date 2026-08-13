@@ -505,7 +505,10 @@ async function processInboundGreenApiMessageNow(input: InboundGreenApiMessage): 
         direction: 'in',
         sender: 'client',
         author_name: input.authorName,
-        text: input.text,
+        // Ссылка на вложение хранится маркером прямо в тексте: отдельной
+        // колонки под медиа нет, а чек менеджеру в карточке сделки нужен
+        // (см. MEDIA_MARKER в src/actions/deals.ts).
+        text: input.mediaUrl ? `${input.text}\n[media]${input.mediaUrl}` : input.text,
       },
       { onConflict: 'amo_message_id', ignoreDuplicates: true }
     )

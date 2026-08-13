@@ -23,6 +23,7 @@ import {
   getDealConversation,
   getDealBotControl,
   setDealBotControl,
+  sendDealMessage,
 } from '@/actions/deals'
 import type {
   Deal,
@@ -61,7 +62,17 @@ interface FormState {
 
 const AMO_MEDIA_MESSAGE = /^\[([^\]]+)]\s+(https:\/\/\S+)$/i
 
-function ChatMessageContent({ text }: { text: string }) {
+function ChatMessageContent({ text, mediaUrl }: { text: string; mediaUrl?: string | null }) {
+  if (mediaUrl) {
+    return (
+      <>
+        {text && <span className="mb-1 block">{text}</span>}
+        <a href={mediaUrl} target="_blank" rel="noreferrer" className="font-medium underline underline-offset-2">
+          📎 Открыть вложение (чек/фото)
+        </a>
+      </>
+    )
+  }
   const media = text.match(AMO_MEDIA_MESSAGE)
   if (!media) return text
   const type = media[1].toLowerCase()
@@ -100,6 +111,26 @@ export default function DealModal({
   const [conversationReload, setConversationReload] = useState(0)
   const [botControl, setBotControl] = useState<{ chatId: string | null; managerControls: boolean } | null>(null)
   const [togglingBotControl, setTogglingBotControl] = useState(false)
+  const [replyText, setReplyText] = useState('')
+  const [sendingReply, setSendingReply] = useState(false)
+
+  async function handleSendReply() {
+    if (!deal || !replyText.trim() || sendingReply) return
+    setSendingReply(true)
+    const text = replyText.trim()
+    const result = await sendDealMessage(deal.id, text)
+    setSendingReply(false)
+    if (!result.success) {
+      toast.error(result.error)
+      return
+    }
+    setReplyText('')
+    setMessages((prev) => [
+      ...(prev ?? []),
+      { id: `local:${Date.now()}`, direction: 'out', sender: 'operator', text, created_at: new Date().toISOString() },
+    ])
+    setBotControl((prev) => (prev ? { ...prev, managerControls: true } : prev))
+  }
 
   const [form, setForm] = useState<FormState>(() => ({
     title: deal?.title ?? '',
@@ -479,9 +510,29 @@ export default function DealModal({
                           {m.sender === 'bot' ? '🤖 Бот' : '👤 Менеджер'}
                         </span>
                       )}
-                      <ChatMessageContent text={m.text} />
+                      <ChatMessageContent text={m.text} mediaUrl={m.media_url} />
                     </div>
                   ))}
+                </div>
+              )}
+              {messages !== null && (
+                <div className="mt-2 flex items-center gap-2">
+                  <Input
+                    value={replyText}
+                    onChange={(event) => setReplyText(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' && !event.shiftKey) {
+                        event.preventDefault()
+                        handleSendReply()
+                      }
+                    }}
+                    placeholder="Написать клиенту…"
+                    disabled={sendingReply}
+                    className="text-[13px]"
+                  />
+                  <Button size="sm" onClick={handleSendReply} disabled={sendingReply || !replyText.trim()}>
+                    {sendingReply ? '…' : 'Отправить'}
+                  </Button>
                 </div>
               )}
             </div>
