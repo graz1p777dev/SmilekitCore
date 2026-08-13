@@ -56,8 +56,11 @@ export async function POST(request: NextRequest) {
       messageType: typeMessage,
       mediaUrl: body.messageData?.fileMessageData?.downloadUrl ?? null,
     })
-  } else if (body.typeWebhook === 'outgoingMessageReceived' || body.typeWebhook === 'outgoingAPIMessageReceived') {
-    // Сообщение от менеджера напрямую из WhatsApp (не через нашего бота).
+  } else if (body.typeWebhook === 'outgoingMessageReceived') {
+    // Только сообщения, отправленные с самого телефона — это живой менеджер.
+    // outgoingAPIMessageReceived сюда не попадает: через API шлём только мы,
+    // и раньше собственное эхо бота (подводка перед фото) записывалось как
+    // менеджер — бот замолкал в чате посреди своей же отправки.
     if (text) {
       void registerOutgoingGreenApiMessage({ providerMessageId, chatId: phone, authorName, text })
     }

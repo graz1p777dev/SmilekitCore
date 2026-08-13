@@ -512,6 +512,17 @@ async function processInboundGreenApiMessageNow(input: InboundGreenApiMessage): 
     // каждый короткий ответ клиента, и без этой защиты бот присылал фото
     // снова и снова. В Telegram ту же роль играет storage.claim_event.
     if (sendResultPhotos && index === 0 && mediaBaseUrl && await claimResultPhotos(supabase, input.chatId)) {
+      // Запись бота ДО отправки обязательна для любого исходящего: эхо из
+      // вебхука Green API ищет свежую строку sender='bot' с тем же текстом,
+      // и без неё подводка опозналась бы как сообщение менеджера — бот
+      // замолкал в чате прямо посреди отправки фото.
+      await supabase.from('amocrm_messages').upsert({
+        amo_message_id: `ga:bot:${input.providerMessageId}:results-intro`,
+        chat_id: input.chatId,
+        direction: 'out',
+        sender: 'bot',
+        text: RESULTS_INTRO,
+      }, { onConflict: 'amo_message_id', ignoreDuplicates: true })
       await sendGreenApiMessage(chatId, RESULTS_INTRO).catch((error) =>
         console.error('greenapi bot-reply: results intro failed', error)
       )
