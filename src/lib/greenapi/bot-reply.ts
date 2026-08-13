@@ -137,6 +137,14 @@ function shouldSendResultsAfterLocation(text: string, historyText: string): bool
 const ORDER_INTENT =
   /хочу\s+(?:заказать|купить|взять)|(?:как|где)\s+(?:заказать|купить|оформить)|закажу|заказать|оформить|оформляйте|оформляем|\bберу\b|возьму|можно\s+оформить|реквизит|куда\s+(?:скинуть|перевести|оплатить|платить)|как\s+оплатить|способ\s+оплаты|\bqr[\s-]?код/i
 
+// Короткое согласие само по себе намерения не выражает («давайте» может
+// относиться к чему угодно) — засчитываем его как заказ, только если прошлое
+// сообщение бота было предложением оформить. Иначе ответ уходил в ИИ и клиент
+// вместо чек-листа получал произвольную формулировку.
+const AFFIRMATIVE_ONLY =
+  /^\s*(?:да|ага|угу|давай(?:те)?|ок(?:ей)?|хорошо|конечно|согласен|согласна|можно)[\s!.,)😊👍]*$/i
+const ORDER_CTA_MARKER = /оформить вам|продолжим оформление/i
+
 // Подводка перед фото — дословно как в Telegram (__main__.py).
 const RESULTS_INTRO = 'Вот результат нашего клиента до и после применения 👇'
 
@@ -425,6 +433,9 @@ async function processInboundGreenApiMessageNow(input: InboundGreenApiMessage): 
     shouldSendResultsAfterLocation(input.text, historyText) || Boolean(deliveryTemplate && priceKnown)
   const resultsBlockAllowed = wantsResultsBlock ? await claimResultsBlock(supabase, input.chatId) : false
 
+  const lastBotMessage = [...history].reverse().find((item) => item.role === 'assistant')?.content ?? ''
+  const acceptedOrderCta = AFFIRMATIVE_ONLY.test(input.text) && ORDER_CTA_MARKER.test(lastBotMessage)
+
   if (history.length > 0 && GREETING_ONLY.test(input.text)) {
     replies.push(
       isKyrgyz
@@ -444,7 +455,7 @@ async function processInboundGreenApiMessageNow(input: InboundGreenApiMessage): 
     replies.push(COMPLAINT_PROMPT)
   } else if (COOPERATION.test(input.text)) {
     replies.push(COOPERATION_REPLY)
-  } else if (ORDER_INTENT.test(input.text)) {
+  } else if (ORDER_INTENT.test(input.text) || acceptedOrderCta) {
     replies.push(ORDER_CHECKLIST)
     stageAction = 'order'
   } else if (deliveryTemplate && priceKnown && resultsBlockAllowed) {
