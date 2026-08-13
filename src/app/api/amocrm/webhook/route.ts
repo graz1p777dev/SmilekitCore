@@ -16,6 +16,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  // Канал выключен (переезд на Green API) — принимаем и молча игнорируем:
+  // 200 нужен, чтобы amoCRM не ретраил и не отключил вебхук сам.
+  if (process.env.AMOCRM_CHANNEL_ENABLED !== 'true') {
+    return NextResponse.json({ ok: true, skipped: 'amocrm channel disabled' })
+  }
+
   const contentType = request.headers.get('content-type') ?? ''
   const raw = await request.text()
 
