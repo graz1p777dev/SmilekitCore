@@ -75,7 +75,13 @@ async function fetchAllRows<T>(
   return rows
 }
 
-async function eligibleRecipients(): Promise<Recipient[]> {
+export interface LastMessageDateFilter {
+  /** ISO-даты (включительно), фильтр по последнему сообщению КЛИЕНТА в чате. */
+  from?: string
+  to?: string
+}
+
+async function eligibleRecipients(dateFilter?: LastMessageDateFilter): Promise<Recipient[]> {
   const admin = createAdminClient()
   const [deals, { data: orders }, amoMessages, { data: optOuts }] = await Promise.all([
     fetchAllRows<{ id: string; source: string; external_key: string | null; customer_phone: string | null }>(
@@ -87,8 +93,8 @@ async function eligibleRecipients(): Promise<Recipient[]> {
       .select('deal_id')
       .neq('status', 'cancelled')
       .is('deleted_at', null),
-    fetchAllRows<{ id: number; chat_id: string; lead_id: string | null; contact_id: string | null; sender: string }>(
-      admin, 'amocrm_messages', 'id, chat_id, lead_id, contact_id, sender',
+    fetchAllRows<{ id: number; chat_id: string; lead_id: string | null; contact_id: string | null; sender: string; created_at: string }>(
+      admin, 'amocrm_messages', 'id, chat_id, lead_id, contact_id, sender, created_at',
       (q) => q.order('id', { ascending: false })
     ),
     admin.from('campaign_opt_outs').select('phone'),
@@ -99,13 +105,22 @@ async function eligibleRecipients(): Promise<Recipient[]> {
     (amoMessages ?? []).filter((row) => row.sender === 'operator').map((row) => String(row.chat_id))
   )
   const amoByLead = new Map<string, { chatId: string; contactId: string | null }>()
+  // amoMessages отсортирован id DESC — первое сообщение клиента на lead_id
+  // при таком порядке и есть последнее по времени.
+  const lastClientMessageAtByLead = new Map<string, string>()
   for (const row of amoMessages ?? []) {
-    if (!row.lead_id || amoByLead.has(String(row.lead_id))) continue
+    if (!row.lead_id) continue
+    if (row.sender === 'client' && !lastClientMessageAtByLead.has(String(row.lead_id))) {
+      lastClientMessageAtByLead.set(String(row.lead_id), row.created_at)
+    }
+    if (amoByLead.has(String(row.lead_id))) continue
     amoByLead.set(String(row.lead_id), {
       chatId: String(row.chat_id),
       contactId: row.contact_id ? String(row.contact_id) : null,
     })
   }
+  const fromTime = dateFilter?.from ? new Date(dateFilter.from).getTime() : null
+  const toTime = dateFilter?.to ? new Date(dateFilter.to).getTime() : null
 
   return (deals ?? []).flatMap((deal): Recipient[] => {
     const id = String(deal.id)
@@ -113,6 +128,7 @@ async function eligibleRecipients(): Promise<Recipient[]> {
     if (!key || purchased.has(id)) return []
     if (excludedPhones.has(normalizePhone(deal.customer_phone))) return []
     if (deal.source === 'telegram' && key.startsWith('telegram:')) {
+      if (fromTime || toTime) return [] // фильтр по дате пока считаем только для WhatsApp-канала
       const chatId = key.slice('telegram:'.length)
       return /^-?\d+$/.test(chatId) ? [{
         deal_id: id,
@@ -131,6 +147,13 @@ async function eligibleRecipients(): Promise<Recipient[]> {
       const leadId = key.slice('amocrm:'.length)
       const chat = amoByLead.get(leadId)
       if (!chat || managerChats.has(chat.chatId)) return []
+      if (fromTime || toTime) {
+        const lastAt = lastClientMessageAtByLead.get(leadId)
+        if (!lastAt) return []
+        const lastTime = new Date(lastAt).getTime()
+        if (fromTime && lastTime < fromTime) return []
+        if (toTime && lastTime > toTime) return []
+      }
       return [{
         deal_id: id,
         channel: 'whatsapp',
@@ -156,10 +179,20 @@ export async function getCampaignsData(): Promise<CampaignsData> {
   return { campaigns: (data ?? []) as CampaignRow[], eligibleCount: recipients.length, optOuts }
 }
 
+/** Живой пересчёт аудитории под введённые вручную даты (для UI, до создания рассылки). */
+export async function getEligibleCountForRange(dateFrom?: string, dateTo?: string): Promise<number> {
+  const me = await viewer()
+  if (!me || !['owner', 'rop'].includes(me.role)) return 0
+  const recipients = await eligibleRecipients({ from: dateFrom || undefined, to: dateTo || undefined })
+  return recipients.length
+}
+
 const CampaignSchema = z.object({
   title: z.string().trim().min(1).max(160),
   message: z.string().trim().min(1).max(4000),
   scheduledAt: z.string().datetime(),
+  dateFrom: z.string().optional(),
+  dateTo: z.string().optional(),
 })
 
 export async function scheduleCampaign(input: unknown): Promise<{ success: true; count: number } | { success: false; error: string }> {
@@ -169,8 +202,8 @@ export async function scheduleCampaign(input: unknown): Promise<{ success: true;
   if (!parsed.success) return { success: false, error: 'Заполните название, сообщение и время отправки' }
   const scheduledAt = new Date(parsed.data.scheduledAt)
   if (scheduledAt.getTime() < Date.now() - 60_000) return { success: false, error: 'Время отправки уже прошло' }
-  const recipients = await eligibleRecipients()
-  if (!recipients.length) return { success: false, error: 'Нет доступных клиентов без покупки' }
+  const recipients = await eligibleRecipients({ from: parsed.data.dateFrom, to: parsed.data.dateTo })
+  if (!recipients.length) return { success: false, error: 'Нет доступных клиентов без покупки за выбранный период' }
 
   const admin = createAdminClient()
   const { data: campaign, error } = await admin.from('campaigns').insert({

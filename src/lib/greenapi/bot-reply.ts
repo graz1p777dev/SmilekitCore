@@ -1,0 +1,441 @@
+// ИИ-ответ клиенту в WhatsApp через Green API — замена amoCRM/WhatCRM-канала
+// (src/lib/amocrm/bot-reply.ts) на тот же номер, но без amoCRM в цепочке.
+//
+// Тот же мозг (тот же Telegram-бот Smilekit, /internal/lab), тот же скрипт
+// продаж и тот же принцип «наш сервер — мастер истории» — только транспорт
+// (Green API вместо amojo) и таблица истории (bot_messages вместо
+// amocrm_messages, chat_id = телефон вместо amojo chat_id).
+//
+// В отличие от amoCRM-канала: Green API отдаёт голосовое сразу с прямой
+// ссылкой в вебхуке — не нужен retry-поиск в «истории чата», её просто нет
+// как отдельного API, вся история — наша же bot_messages.
+
+import { createAdminClient } from '@/lib/supabase/admin'
+import { smilekitBotFetch } from '@/lib/smilekit-bot-api'
+import { upsertDealFromInbound } from '@/lib/deals/auto-create'
+import { advanceDealFromBotAction } from '@/lib/deals/advance-stage'
+import { sendGreenApiMessage } from '@/lib/greenapi/client'
+import { createLimiter } from '@/lib/concurrency-limit'
+
+export interface InboundGreenApiMessage {
+  providerMessageId: string
+  chatId: string // нормализованный телефон (только цифры), см. phoneFromGreenApiChatId
+  authorName: string | null
+  text: string
+  messageType?: string
+  mediaUrl?: string | null
+}
+
+const VOICE_TYPES = new Set(['voice', 'audio', 'audioMessage'])
+const MAX_VOICE_BYTES = 20 * 1024 * 1024
+
+async function transcribeGreenApiVoice(input: InboundGreenApiMessage): Promise<string | null> {
+  if (!VOICE_TYPES.has(input.messageType ?? '') || !input.mediaUrl) return input.text
+  const response = await fetch(input.mediaUrl, { signal: AbortSignal.timeout(20_000) })
+  if (!response.ok) throw new Error(`greenapi voice download: HTTP ${response.status}`)
+  const size = Number(response.headers.get('content-length') || 0)
+  if (size > MAX_VOICE_BYTES) throw new Error('greenapi voice download: file is too large')
+  const audio = Buffer.from(await response.arrayBuffer())
+  if (!audio.length || audio.length > MAX_VOICE_BYTES) throw new Error('greenapi voice download: invalid size')
+  const extension = new URL(input.mediaUrl).pathname.match(/\.([a-z0-9]{2,5})$/i)?.[1] ?? 'ogg'
+  const result = await smilekitBotFetch<{ transcript: string }>('/internal/transcribe', {
+    method: 'POST',
+    body: { audioBase64: audio.toString('base64'), filename: `voice.${extension}` },
+  })
+  return result.ok ? result.data.transcript.trim() || null : null
+}
+
+// ─── Скрипт продаж — те же тексты и правила, что в amoCRM-канале
+// (src/lib/amocrm/bot-reply.ts), держим синхронно вручную до объединения
+// в общий модуль (см. задачу «обобщить bot-reply.ts под мульти-провайдера»).
+
+const PRODUCT_INFO =
+  'Здравствуйте! 😊\n\n' +
+  'SmileKit помогает заметно отбелить зубы уже после первого применения.\n\n' +
+  '📦 В наборе 14 отбеливающих полосок — это полный курс.\n\n' +
+  '💰 ЦЕНА — 1490 СОМ.🇰🇬'
+
+const KYRGYZ_PRODUCT_INFO =
+  'Салам! 😊 Бир кутусу — 1490 сом. Ичинде 14 даана тилке бар — бул толук курс. ' +
+  'Таасири биринчи колдонуудан кийин эле байкалат.\n\n' +
+  'Кайсы шаардан болосуз? Жеткирүү боюнча айтып берем.'
+
+const KYRGYZ_MARKERS =
+  /баа|наркы|канча|кайсы|шаар|жеткир|тиш|агарт|колдон|куту|барбы|алам|керек|рахмат|болобу|кантип|эмне/i
+const KYRGYZ_PRICE_INTENT = /баа|наркы|канча\s*(?:сом|турат)/i
+const LINK_IN_MESSAGE = /(?:https?:\/\/|www\.)\S+/i
+const GREETING_ONLY = /^\s*(?:улыбка|здравствуйте|здравствуй|привет|добрый\s+(?:день|вечер|утро))[!,.?\s😊👋]*$/iu
+
+const CITY_QUESTION = 'Подскажите, пожалуйста, из какого вы города?'
+
+const FIRST_USE_EFFECT =
+  'Гарантированно увидите эффект с первого раза 😁. После курса эффект будет постоянный✅😊'
+
+const LOW_STOCK_DISCOUNT_CTA =
+  'Кстати, у нас осталось буквально 2 упаковки, поэтому мы их отдаем по скидке 10% ☺️\n' +
+  'Оформить вам доставку ?)'
+
+const ORDER_CHECKLIST =
+  'Чтобы оформить заказ, пожалуйста, отправьте 😊\n\n' +
+  '• чек об оплате;\n\n' +
+  '• адрес доставки;\n\n' +
+  '• номер телефона.'
+
+const RETURNING_GREETING_REPLIES = [
+  'Здравствуйте! 😊 Рада снова вас видеть. Чем могу помочь?',
+  'Здравствуйте! 😊 Конечно, я на связи. Что подсказать?',
+  'Здравствуйте! 😊 Продолжим — чем могу помочь?',
+]
+
+const RETURNING_KYRGYZ_GREETING_REPLIES = [
+  'Салам! 😊 Кайрадан көргөнүмө кубанычтамын. Кантип жардам берейин?',
+  'Салам! 😊 Мен байланышта элем. Эмне боюнча жардам керек?',
+]
+
+const COMPLAINT_PROMPT = 'Подскажите, пожалуйста, что вас не устроило — для улучшения нашего сервиса.'
+
+const COOPERATION_REPLY =
+  'Спасибо за интерес! Вопросами сотрудничества и опта занимается наш менеджер — он свяжется с вами в ближайшее время.'
+
+const DELIVERY_TEMPLATES: [RegExp, string][] = [
+  [/бишкек|токмок/, 'Отлично, у нас есть доставка через Яндекс, за 30 минут доставим'],
+  [
+    /\bош\b|джалал-?абад|каракол|нарын|талас|баткен|балыкч|манас/,
+    'Да, у нас есть доставка через Ылдам Экспресс 🚚✅. Если оформить сейчас, доставка будет уже завтра или послезавтра',
+  ],
+  [/алмат/, 'Да, доставим! В Алматы — ориентировочно в течение 30 минут'],
+  [/астан/, 'Да, доставим! По остальным регионам Казахстана — ориентировочно за 1–3 дня'],
+  [/ташкент/, 'Да, доставим! В Ташкенте — ориентировочно в течение 1 часа'],
+  [
+    /москв|росси/,
+    'Своего склада в России нет, отправляем через СДЭК — доставка от 7 дней. Точную стоимость доставки уточним отдельно',
+  ],
+]
+
+function deliveryTemplateForCity(text: string): string | null {
+  const normalized = text.toLowerCase()
+  for (const [pattern, template] of DELIVERY_TEMPLATES) {
+    if (pattern.test(normalized)) return template
+  }
+  return null
+}
+
+function shouldSendResultsAfterLocation(text: string, historyText: string): boolean {
+  const normalized = text.trim().toLowerCase().replace(/\s+/g, ' ')
+  const priorPrice = historyText.includes('цена') || historyText.includes('сом')
+  if (!priorPrice || LINK_IN_MESSAGE.test(text) || GREETING_ONLY.test(text)) return false
+  const askedForCity = historyText.includes('из какого вы города') || historyText.includes('вы в бишкеке')
+  const shortLocationAnswer = !/[?？]/.test(text) && normalized.split(/\s+/).length <= 5
+  const deliveryQuestion = /достав|жеткир|отправ|привез/iu.test(text)
+  return deliveryQuestion || (askedForCity && shortLocationAnswer)
+}
+
+const ORDER_INTENT =
+  /хочу\s+(?:заказать|купить|взять)|(?:как|где)\s+(?:заказать|купить|оформить)|закажу|заказать|оформить|оформляйте|оформляем|\bберу\b|возьму|можно\s+оформить|реквизит|куда\s+(?:скинуть|перевести|оплатить|платить)|как\s+оплатить|способ\s+оплаты|\bqr[\s-]?код/i
+
+const SMILEKIT_RESULTS_URL = 'https://smilekit.vercel.app/#results'
+
+const DOUBT_RESULT_REPLY =
+  'Понимаю, лучше один раз увидеть 😊 Вот страница с настоящими фото до/после ' +
+  `и перепиской с нашими покупателями — без прикрас: ${SMILEKIT_RESULTS_URL}\n\n` +
+  'Мы гарантируем эффект уже после первого применения.'
+
+const SCAM_DOUBT =
+  /(?:вы\s+)?(?:точно\s+)?не\s+мошенник|мошенники\s*\?|(?:это\s+)?(?:точно\s+)?не\s+(?:обман|развод|скам|фейк)|без\s+обмана|(?:это\s+)?(?:все|всё)?\s*реально\s*(?:да|\?)|не\s+кин[её]те|вам\s+можно\s+доверять|можно\s+(?:ли\s+)?вам\s+верить|вы\s+настоящие/i
+
+const COMPLAINT =
+  /развод|обман(?:ули)?|кинул|мошенник|верните\s+деньги|хочу\s+возврат|ужасн(?:о|ый|ая)|отвратительн|никогда\s+(?:больше\s+)?не\s+куплю|не\s+помогл|разочарован/i
+const COOPERATION =
+  /сотрудничеств|оптом|\bопт\b|дистрибьютор|дилер|партн[её]р|реселлер|перепродаж|b2b|блогер/i
+
+const READY_TO_BUY = /оформ(?:ить|ляйте)|заказ(?:ать|ываю)?|беру\b|покупаю\b|заброниру|резервиру/i
+const INTEREST_CONFIRMED = /хочу\b|подходит|устраивает|интересует|готов\s+(?:взять|купить)|давайте/i
+const NEED_IDENTIFIED =
+  /полоск|отбелив|улыбк|зуб|цена|сколько\s+стоит|состав|инструкц|противопоказ|результат|скидк|доставк|коробк/i
+
+function stageActionForInbound(text: string): string | null {
+  const value = text.replace(/ё/g, 'е')
+  if (READY_TO_BUY.test(value)) return 'ready_to_buy'
+  if (INTEREST_CONFIRMED.test(value)) return 'interest_confirmed'
+  if (NEED_IDENTIFIED.test(value)) return 'need_identified'
+  return null
+}
+
+/** Исходящее сообщение из вебхука (outgoingMessageReceived/outgoingAPIMessageReceived
+ * с чужим providerMessageId) — живой менеджер написал в WhatsApp напрямую. */
+export async function registerOutgoingGreenApiMessage(input: InboundGreenApiMessage): Promise<void> {
+  const supabase = createAdminClient()
+  const { data: recentBot } = await supabase
+    .from('bot_messages')
+    .select('id')
+    .eq('provider', 'greenapi')
+    .eq('chat_id', input.chatId)
+    .eq('sender', 'bot')
+    .eq('text', input.text)
+    .gte('created_at', new Date(Date.now() - 5 * 60_000).toISOString())
+    .limit(1)
+  if (recentBot?.length) return // эхо нашей же отправки
+
+  await supabase.from('bot_messages').upsert(
+    {
+      provider: 'greenapi',
+      provider_message_id: input.providerMessageId,
+      chat_id: input.chatId,
+      direction: 'out',
+      sender: 'operator',
+      author_name: input.authorName,
+      text: input.text,
+    },
+    { onConflict: 'provider,provider_message_id', ignoreDuplicates: true }
+  )
+}
+
+const chatQueues = new Map<string, Promise<void>>()
+const globalGreenApiProcessingLimit = createLimiter(4)
+
+async function isManagerControllingChat(
+  supabase: ReturnType<typeof createAdminClient>,
+  chatId: string
+): Promise<boolean> {
+  const [lastOperatorResult, controlResult] = await Promise.all([
+    supabase
+      .from('bot_messages')
+      .select('created_at')
+      .eq('chat_id', chatId)
+      .eq('sender', 'operator')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from('amocrm_chat_control')
+      .select('bot_enabled, updated_at')
+      .eq('chat_id', chatId)
+      .maybeSingle(),
+  ])
+  const lastOperatorAt = lastOperatorResult.data?.created_at
+    ? new Date(lastOperatorResult.data.created_at as string).getTime()
+    : null
+  const control = controlResult.data as { bot_enabled: boolean; updated_at: string } | null
+  if (!control) return lastOperatorAt !== null
+  const overrideIsFresh = lastOperatorAt === null || new Date(control.updated_at).getTime() > lastOperatorAt
+  if (overrideIsFresh) return !control.bot_enabled
+  return true
+}
+
+async function isPhoneBlockedForBot(
+  supabase: ReturnType<typeof createAdminClient>,
+  rawPhone: string | null
+): Promise<boolean> {
+  const phone = String(rawPhone || '').replace(/\D/g, '')
+  if (!phone) return false
+  const { data } = await supabase
+    .from('campaign_opt_outs')
+    .select('phone')
+    .eq('phone', phone)
+    .eq('block_bot_replies', true)
+    .maybeSingle()
+  return Boolean(data)
+}
+
+async function canSendGreenApiBotReply(
+  supabase: ReturnType<typeof createAdminClient>,
+  chatId: string
+): Promise<boolean> {
+  // Общий с amoCRM-каналом аварийный выключатель (integrations.amoCRM) —
+  // это переключатель «бот продаж SmileKit включён», а не именно amoCRM.
+  const [integrationResult, managerControls] = await Promise.all([
+    supabase.from('integrations').select('is_active').eq('name', 'amoCRM').maybeSingle(),
+    isManagerControllingChat(supabase, chatId),
+  ])
+  if (integrationResult.error) return false
+  return Boolean((integrationResult.data as { is_active?: boolean } | null)?.is_active) && !managerControls
+}
+
+function enqueueInboundGreenApiMessage(input: InboundGreenApiMessage): Promise<void> {
+  const prev = chatQueues.get(input.chatId) ?? Promise.resolve()
+  const run = prev.then(() => globalGreenApiProcessingLimit(() => processInboundGreenApiMessageNow(input)))
+  const chain = run.then(() => {}, () => {})
+  chatQueues.set(input.chatId, chain)
+  chain.then(() => {
+    if (chatQueues.get(input.chatId) === chain) chatQueues.delete(input.chatId)
+  })
+  return run
+}
+
+export function processInboundGreenApiMessage(input: InboundGreenApiMessage): Promise<void> {
+  return enqueueInboundGreenApiMessage(input)
+}
+
+async function processInboundGreenApiMessageNow(input: InboundGreenApiMessage): Promise<void> {
+  const supabase = createAdminClient()
+
+  const transcript = await transcribeGreenApiVoice(input)
+  if (VOICE_TYPES.has(input.messageType ?? '') && !transcript) {
+    console.error('greenapi bot-reply: voice transcription failed', input.providerMessageId)
+    return
+  }
+  if (transcript) input = { ...input, text: transcript }
+
+  const { data: inserted, error: insertError } = await supabase
+    .from('bot_messages')
+    .upsert(
+      {
+        provider: 'greenapi',
+        provider_message_id: input.providerMessageId,
+        chat_id: input.chatId,
+        direction: 'in',
+        sender: 'client',
+        author_name: input.authorName,
+        text: input.text,
+      },
+      { onConflict: 'provider,provider_message_id', ignoreDuplicates: true }
+    )
+    .select('id')
+  if (insertError) {
+    console.error('greenapi bot-reply: insert failed', insertError.message)
+    return
+  }
+  if (!inserted?.length) return // дубль вебхука — уже обработано
+
+  const externalKey = `greenapi:${input.chatId}`
+  const { data: integration } = await supabase
+    .from('integrations')
+    .select('is_active')
+    .eq('name', 'amoCRM')
+    .maybeSingle()
+  const botEnabled = Boolean((integration as { is_active?: boolean } | null)?.is_active)
+
+  await upsertDealFromInbound({
+    externalKey,
+    source: 'whatsapp',
+    customerName: input.authorName,
+    customerPhone: input.chatId,
+  })
+
+  if (await isManagerControllingChat(supabase, input.chatId)) return
+  if (await isPhoneBlockedForBot(supabase, input.chatId)) return
+
+  const inboundAction = COMPLAINT.test(input.text) || COOPERATION.test(input.text)
+    ? 'non_standard_request'
+    : stageActionForInbound(input.text)
+  if (inboundAction) {
+    const advanced = await advanceDealFromBotAction(externalKey, inboundAction)
+    if (!advanced.ok && advanced.error) {
+      console.error('greenapi bot-reply: stage advance failed', inboundAction, advanced.error)
+    }
+  }
+
+  if (!botEnabled) return
+
+  const { data: rows } = await supabase
+    .from('bot_messages')
+    .select('sender, text, id')
+    .eq('chat_id', input.chatId)
+    .order('created_at', { ascending: false })
+    .order('id', { ascending: false })
+    .limit(31)
+  const history = (rows ?? [])
+    .reverse()
+    .slice(0, -1)
+    .filter((row) => !LINK_IN_MESSAGE.test((row as { text: string }).text))
+    .map((row) => ({
+      role: (row as { sender: string }).sender === 'client' ? 'user' : 'assistant',
+      content: (row as { text: string }).text,
+    }))
+  const historyText = history.map((item) => item.content.toLowerCase()).join(' ')
+  const isKyrgyz = KYRGYZ_MARKERS.test(input.text)
+
+  const replies: string[] = []
+  let sendResultsLink = shouldSendResultsAfterLocation(input.text, historyText)
+  let stageAction: string | null = null
+  const deliveryTemplate = deliveryTemplateForCity(input.text)
+
+  if (history.length > 0 && GREETING_ONLY.test(input.text)) {
+    replies.push(
+      isKyrgyz
+        ? RETURNING_KYRGYZ_GREETING_REPLIES[Math.floor(Math.random() * RETURNING_KYRGYZ_GREETING_REPLIES.length)]
+        : RETURNING_GREETING_REPLIES[Math.floor(Math.random() * RETURNING_GREETING_REPLIES.length)]
+    )
+  } else if (LINK_IN_MESSAGE.test(input.text) || GREETING_ONLY.test(input.text)) {
+    replies.push(PRODUCT_INFO, CITY_QUESTION)
+  } else if (isKyrgyz && KYRGYZ_PRICE_INTENT.test(input.text)) {
+    replies.push(KYRGYZ_PRODUCT_INFO)
+  } else if (history.length === 0) {
+    replies.push(PRODUCT_INFO, CITY_QUESTION)
+  } else if (SCAM_DOUBT.test(input.text)) {
+    replies.push(DOUBT_RESULT_REPLY)
+  } else if (COMPLAINT.test(input.text)) {
+    replies.push(COMPLAINT_PROMPT)
+  } else if (COOPERATION.test(input.text)) {
+    replies.push(COOPERATION_REPLY)
+  } else if (ORDER_INTENT.test(input.text)) {
+    replies.push(ORDER_CHECKLIST)
+    stageAction = 'order'
+  } else if (deliveryTemplate && (historyText.includes('цена') || historyText.includes('сом'))) {
+    replies.push(deliveryTemplate, FIRST_USE_EFFECT)
+    replies.push(historyText.includes('скидк') ? 'Оформить вам? Пока есть в наличии.' : LOW_STOCK_DISCOUNT_CTA)
+    sendResultsLink = true
+  }
+
+  if (replies.length === 0) {
+    const labMessage = isKyrgyz
+      ? `${input.text}\n\nЖоопту толугу менен кыргыз тилинде бер. Орусча сөздөрдү аралаштырба.`
+      : input.text
+    const lab = await smilekitBotFetch<{ reply: string }>('/internal/lab', {
+      method: 'POST',
+      body: { message: labMessage, history },
+    })
+    if (!lab.ok) {
+      console.error('greenapi bot-reply: lab failed', lab.error)
+      return
+    }
+    const reply = lab.data.reply?.trim()
+    if (!reply) return
+    replies.push(
+      ...reply
+        .split(/<NEXT_MESSAGE>/i)
+        .map((part) => part.trim())
+        .filter(Boolean)
+    )
+    if (replies.length === 0) return
+  }
+
+  if (sendResultsLink && !replies.some((r) => r.includes(SMILEKIT_RESULTS_URL))) {
+    replies.push(`Вот страница с реальными фото до/после наших клиентов 📸 ${SMILEKIT_RESULTS_URL}`)
+  }
+
+  for (let index = 0; index < replies.length; index++) {
+    if (!(await canSendGreenApiBotReply(supabase, input.chatId))) return
+    const text = replies[index]
+    const botMessageId = `bot:${input.providerMessageId}:${index}`
+    const { error: reserveError } = await supabase.from('bot_messages').upsert({
+      provider: 'greenapi',
+      provider_message_id: botMessageId,
+      chat_id: input.chatId,
+      direction: 'out',
+      sender: 'bot',
+      text,
+    }, { onConflict: 'provider,provider_message_id', ignoreDuplicates: true })
+    if (reserveError) {
+      console.error('greenapi bot-reply: bot message reserve failed', reserveError.message)
+      return
+    }
+    try {
+      await sendGreenApiMessage(`${input.chatId}@c.us`, text)
+    } catch (error) {
+      await supabase.from('bot_messages').delete().eq('provider', 'greenapi').eq('provider_message_id', botMessageId)
+      console.error('greenapi bot-reply: send failed', error)
+      return
+    }
+    if (index < replies.length - 1) {
+      await new Promise((resolve) => setTimeout(resolve, 900 + Math.random() * 500))
+    }
+  }
+
+  if (stageAction) {
+    const result = await advanceDealFromBotAction(externalKey, stageAction)
+    if (!result.ok && result.error) {
+      console.error('greenapi bot-reply: stage advance failed', stageAction, result.error)
+    }
+  }
+}

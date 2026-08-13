@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import {
   addOptOutPhone,
   cancelCampaign,
+  getEligibleCountForRange,
   removeOptOutPhone,
   scheduleCampaign,
   type CampaignsData,
@@ -45,6 +46,10 @@ export default function CampaignsClient({ initialData }: { initialData: Campaign
   const [title, setTitle] = useState('')
   const [message, setMessage] = useState('')
   const [scheduledAt, setScheduledAt] = useState(defaultSchedule)
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
+  const [eligibleCount, setEligibleCount] = useState(initialData.eligibleCount)
+  const [countLoading, setCountLoading] = useState(false)
   const [optOutPhone, setOptOutPhone] = useState('')
   const [optOutReason, setOptOutReason] = useState('')
   const [optOutBlockBot, setOptOutBlockBot] = useState(false)
@@ -54,6 +59,23 @@ export default function CampaignsClient({ initialData }: { initialData: Campaign
     return () => clearInterval(timer)
   }, [router])
 
+  // Аудитория пересчитывается под введённые вручную даты «последнее
+  // сообщение клиента от … до …» — без диапазона используется дефолтное
+  // значение с сервера (initialData.eligibleCount).
+  useEffect(() => {
+    if (!dateFrom && !dateTo) {
+      setEligibleCount(initialData.eligibleCount)
+      return
+    }
+    setCountLoading(true)
+    const timer = setTimeout(() => {
+      getEligibleCountForRange(dateFrom || undefined, dateTo || undefined)
+        .then(setEligibleCount)
+        .finally(() => setCountLoading(false))
+    }, 400)
+    return () => clearTimeout(timer)
+  }, [dateFrom, dateTo, initialData.eligibleCount])
+
   const scheduleLabel = useMemo(() => {
     const date = new Date(scheduledAt)
     return Number.isNaN(date.getTime()) ? 'Выберите время' : formatDate(date.toISOString())
@@ -61,7 +83,13 @@ export default function CampaignsClient({ initialData }: { initialData: Campaign
 
   function submit() {
     startTransition(async () => {
-      const result = await scheduleCampaign({ title, message, scheduledAt: new Date(scheduledAt).toISOString() })
+      const result = await scheduleCampaign({
+        title,
+        message,
+        scheduledAt: new Date(scheduledAt).toISOString(),
+        dateFrom: dateFrom || undefined,
+        dateTo: dateTo || undefined,
+      })
       if (!result.success) {
         toast.error(result.error)
         return
@@ -70,6 +98,8 @@ export default function CampaignsClient({ initialData }: { initialData: Campaign
       setTitle('')
       setMessage('')
       setScheduledAt(defaultSchedule())
+      setDateFrom('')
+      setDateTo('')
       router.refresh()
     })
   }
@@ -115,7 +145,7 @@ export default function CampaignsClient({ initialData }: { initialData: Campaign
     })
   }
 
-  const valid = title.trim() && message.trim() && scheduledAt && initialData.eligibleCount > 0
+  const valid = title.trim() && message.trim() && scheduledAt && eligibleCount > 0
 
   return (
     <div className="min-h-full" style={{ background: 'var(--surface-2)' }}>
@@ -149,6 +179,22 @@ export default function CampaignsClient({ initialData }: { initialData: Campaign
                 <Label htmlFor="campaign-time">Дата и время</Label>
                 <Input id="campaign-time" type="datetime-local" value={scheduledAt} onChange={(event) => setScheduledAt(event.target.value)} />
               </div>
+              <div className="space-y-2">
+                <Label>Последнее сообщение клиента — период (необязательно)</Label>
+                <div className="flex items-center gap-2">
+                  <Input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} aria-label="От даты" />
+                  <span className="text-sm" style={{ color: 'var(--ink-3)' }}>—</span>
+                  <Input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} aria-label="До даты" />
+                  {(dateFrom || dateTo) && (
+                    <Button type="button" variant="ghost" size="sm" onClick={() => { setDateFrom(''); setDateTo('') }}>
+                      Сбросить
+                    </Button>
+                  )}
+                </div>
+                <p className="text-xs" style={{ color: 'var(--ink-3)' }}>
+                  Только WhatsApp-канал. Пусто — без фильтра по дате.
+                </p>
+              </div>
               <Button size="lg" className="w-full" disabled={!valid || pending} onClick={submit}>
                 <CalendarClock /> {pending ? 'Сохраняем…' : 'Запланировать рассылку'}
               </Button>
@@ -159,7 +205,7 @@ export default function CampaignsClient({ initialData }: { initialData: Campaign
             <div className="p-6">
               <p className="text-xs font-semibold uppercase tracking-[.16em] text-white/60">Аудитория</p>
               <div className="mt-4 flex items-end gap-2">
-                <strong className="text-5xl leading-none tabular-nums">{initialData.eligibleCount}</strong>
+                <strong className="text-5xl leading-none tabular-nums" style={{ opacity: countLoading ? 0.5 : 1 }}>{eligibleCount}</strong>
                 <span className="pb-1 text-sm text-white/70">клиентов</span>
               </div>
               <p className="mt-3 text-sm leading-relaxed text-white/75">Сделки без оплаченного заказа в Telegram, WhatsApp и Instagram.</p>
