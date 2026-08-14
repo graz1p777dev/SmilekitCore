@@ -26,8 +26,20 @@ export interface OutboundWebhook {
   url: string
 }
 
+export interface CustomRule {
+  id: string
+  /** Regex (без флагов, регистр не важен — всегда 'i') по тексту клиента. */
+  trigger: string
+  reply: string
+  /** Выключить не удаляя — быстро откатить правило без потери текста. */
+  enabled: boolean
+}
+
 export interface WhatsappBotConfig {
   templates: Partial<WhatsappTemplates>
+  /** Свои правила «условие → ответ», проверяются до основного скрипта продаж
+   * и до ИИ — первое совпавшее enabled-правило выигрывает. */
+  customRules: CustomRule[]
   deliveryGroupId: string | null
   /** Что и как форматировать при отправке подтверждённого заказа в группу. */
   deliveryPrompt: string | null
@@ -38,6 +50,7 @@ export interface WhatsappBotConfig {
 
 const DEFAULTS: WhatsappBotConfig = {
   templates: {},
+  customRules: [],
   deliveryGroupId: null,
   deliveryPrompt: null,
   outboundWebhooks: [],
@@ -53,6 +66,7 @@ export async function getWhatsappBotConfig(): Promise<WhatsappBotConfig> {
   const stored = extra[SETTINGS_KEY] as Partial<WhatsappBotConfig> | undefined
   return {
     templates: stored?.templates ?? {},
+    customRules: stored?.customRules ?? [],
     deliveryGroupId: stored?.deliveryGroupId ?? null,
     deliveryPrompt: stored?.deliveryPrompt ?? null,
     outboundWebhooks: stored?.outboundWebhooks ?? [],

@@ -727,7 +727,26 @@ async function processInboundGreenApiMessageNow(input: InboundGreenApiMessage): 
     cooperationReply: botConfig.templates.cooperationReply || COOPERATION_REPLY,
   }
 
-  if (history.length > 0 && GREETING_ONLY.test(input.text)) {
+  // Свои правила из настроек CRM — проверяются раньше встроенного скрипта:
+  // владелец может перекрыть штатное поведение своим условием, не трогая код.
+  // Первое совпавшее enabled-правило побеждает; regex ломает диалог только
+  // самому себе (invalid regex) — try/catch, а не падение всего ответа.
+  let customRuleReply: string | null = null
+  for (const rule of botConfig.customRules) {
+    if (!rule.enabled || !rule.trigger.trim()) continue
+    try {
+      if (new RegExp(rule.trigger, 'i').test(input.text)) {
+        customRuleReply = rule.reply
+        break
+      }
+    } catch (error) {
+      console.error('greenapi bot-reply: invalid custom rule regex', rule.id, error)
+    }
+  }
+
+  if (customRuleReply) {
+    replies.push(customRuleReply)
+  } else if (history.length > 0 && GREETING_ONLY.test(input.text)) {
     replies.push(
       isKyrgyz
         ? RETURNING_KYRGYZ_GREETING_REPLIES[Math.floor(Math.random() * RETURNING_KYRGYZ_GREETING_REPLIES.length)]
