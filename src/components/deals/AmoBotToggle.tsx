@@ -20,7 +20,20 @@ export function AmoBotToggle() {
     if (enabled == null) return
     const next = !enabled
     startBusy(async () => {
-      const result = await setAmoBotEnabled(next)
+      // Сервер иногда не отвечает вовсе — не ошибкой, а зависшим запросом
+      // (см. префетч в Sidebar.tsx: залповая нагрузка при навигации может
+      // подвесить параллельный запрос без таймаута и без ответа). Без гонки
+      // с таймаутом кнопка оставалась disabled навсегда, до жёсткой
+      // перезагрузки страницы — busy никогда не сбрасывался.
+      const timedOut = Symbol('timeout')
+      const result = await Promise.race([
+        setAmoBotEnabled(next),
+        new Promise<typeof timedOut>((resolve) => setTimeout(() => resolve(timedOut), 10_000)),
+      ])
+      if (result === timedOut) {
+        toast.error('Сервер не ответил — попробуйте ещё раз через несколько секунд')
+        return
+      }
       if (!result.success) {
         toast.error(result.error)
         return

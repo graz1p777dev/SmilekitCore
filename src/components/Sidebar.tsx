@@ -174,6 +174,14 @@ export default function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
                         <LinkTag
                           ref={(el) => { itemRefs.current.set(item.href, el) }}
                           href={item.href}
+                          // По умолчанию Next.js префетчит данные КАЖДОЙ ссылки
+                          // в сайдбаре (12+ пунктов), едва они попадают в
+                          // вьюпорт — на каждую навигацию это залповая нагрузка
+                          // на сервер, под которой другие запросы (например
+                          // server actions вроде переключателя бота) могут
+                          // зависать без ответа и без ошибки, блокируя UI
+                          // до перезагрузки страницы (см. AmoBotToggle).
+                          prefetch={false}
                           title={expanded ? undefined : item.label}
                           className={cn(
                             'relative flex items-center gap-2.5 px-2.5 py-2 rounded-md transition-colors duration-150 outline-none',

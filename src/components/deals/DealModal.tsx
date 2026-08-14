@@ -196,8 +196,18 @@ export default function DealModal({
     if (!botControl?.chatId) return
     const nextBotEnabled = botControl.managerControls // сейчас у менеджера → включаем бота
     setTogglingBotControl(true)
-    const res = await setDealBotControl(botControl.chatId, nextBotEnabled)
+    // Сервер иногда не отвечает вовсе (см. AmoBotToggle.tsx) — без таймаута
+    // кнопка оставалась disabled до перезагрузки страницы.
+    const timedOut = Symbol('timeout')
+    const res = await Promise.race([
+      setDealBotControl(botControl.chatId, nextBotEnabled),
+      new Promise<typeof timedOut>((resolve) => setTimeout(() => resolve(timedOut), 10_000)),
+    ])
     setTogglingBotControl(false)
+    if (res === timedOut) {
+      toast.error('Сервер не ответил — попробуйте ещё раз через несколько секунд')
+      return
+    }
     if (!res.success) {
       toast.error(res.error)
       return
