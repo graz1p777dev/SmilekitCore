@@ -50,15 +50,19 @@ export default function DealsBoard({ initialStages, initialDeals, employees, me,
   const [syncing, startSync] = useTransition()
 
   // Переход со страницы «Заказы» — открываем карточку сразу, не дожидаясь
-  // клика по колонке. Однократно на маунт: initialOpenDealId — это заморозка
-  // URL на момент захода, а не то, что должно переоткрывать модалку заново
-  // при каждом ререндере.
+  // клика по колонке. Зависимость от initialOpenDealId обязательна: при
+  // клиентской навигации (Link) на тот же /dashboard/deals с новым ?deal=
+  // React переиспользует уже смонтированный DealsBoard, а не пересоздаёт
+  // его — эффект с пустым []-массивом зависимостей срабатывал только на
+  // первый заход и не реагировал на смену параметра в URL при последующих
+  // переходах (кнопка «Написать →» из заказа работала только после
+  // жёсткой перезагрузки страницы, где компонент действительно монтируется
+  // заново).
   useEffect(() => {
     if (!initialOpenDealId) return
     const target = initialDeals.find((d) => d.id === initialOpenDealId)
     if (target) setModal({ open: true, deal: target, isNew: false, stageId: target.stage_id })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [initialOpenDealId, initialDeals])
 
   const stages = initialStages
   const defaultStageId = useMemo(
