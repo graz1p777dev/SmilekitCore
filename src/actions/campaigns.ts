@@ -204,6 +204,24 @@ async function eligibleRecipients(filter?: AudienceFilter): Promise<Recipient[]>
         contact_id: chat?.contactId ?? null,
       }]
     }
+    if (deal.source === 'whatsapp' && key.startsWith('greenapi:')) {
+      // Сделки, заведённые уже напрямую через Green API (без amoCRM в
+      // цепочке, см. resolveGreenApiExternalKey в src/lib/greenapi/bot-reply.ts).
+      // Раньше этой ветки не было вовсе — такие сделки не попадали ни в одну
+      // рассылку, независимо от выбранной аудитории.
+      const phone = key.slice('greenapi:'.length)
+      if (!greenApiReady || phone.length < 9) return []
+      if (managerChats.has(phone)) return []
+      if (fromTime || toTime) return [] // фильтр по дате пока считаем только для amoCRM-истории
+      return [{
+        deal_id: id,
+        channel: 'whatsapp',
+        external_key: key,
+        chat_id: phone,
+        lead_id: null,
+        contact_id: null,
+      }]
+    }
     return []
   })
 }

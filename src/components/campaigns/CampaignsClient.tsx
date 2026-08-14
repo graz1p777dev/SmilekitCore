@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState, useTransition } from 'react'
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Bot, CalendarClock, CheckCircle2, Clock3, Send, ShieldCheck, ShieldX, Trash2, UsersRound, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
@@ -51,6 +51,7 @@ export default function CampaignsClient({ initialData }: { initialData: Campaign
   const [dateTo, setDateTo] = useState('')
   const [audience, setAudience] = useState<CampaignAudience>('not_purchased')
   const [eligibleCount, setEligibleCount] = useState(initialData.eligibleCount)
+  const requestSeq = useRef(0)
   const [countLoading, setCountLoading] = useState(false)
   const [optOutPhone, setOptOutPhone] = useState('')
   const [optOutReason, setOptOutReason] = useState('')
@@ -64,16 +65,24 @@ export default function CampaignsClient({ initialData }: { initialData: Campaign
   // Аудитория пересчитывается под введённые вручную даты «последнее
   // сообщение клиента от … до …» — без диапазона используется дефолтное
   // значение с сервера (initialData.eligibleCount).
+  //
+  // requestSeq защищает от гонки: быстрый повторный клик по «Кто купил» /
+  // «Всем» шлёт новый запрос раньше, чем ответит предыдущий — без проверки
+  // «это ещё актуальный запрос?» медленный старый ответ мог прийти позже
+  // быстрого нового и переписать eligibleCount неверным числом (в UI это
+  // выглядело как «то 9, то 0» при переключении кнопок).
   useEffect(() => {
     if (!dateFrom && !dateTo && audience === 'not_purchased') {
+      requestSeq.current += 1
       setEligibleCount(initialData.eligibleCount)
       return
     }
     setCountLoading(true)
+    const seq = ++requestSeq.current
     const timer = setTimeout(() => {
       getEligibleCountForRange(dateFrom || undefined, dateTo || undefined, audience)
-        .then(setEligibleCount)
-        .finally(() => setCountLoading(false))
+        .then((count) => { if (seq === requestSeq.current) setEligibleCount(count) })
+        .finally(() => { if (seq === requestSeq.current) setCountLoading(false) })
     }, 400)
     return () => clearTimeout(timer)
   }, [dateFrom, dateTo, audience, initialData.eligibleCount])

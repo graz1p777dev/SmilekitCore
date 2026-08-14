@@ -11,18 +11,28 @@ import { Textarea } from '@/components/ui/textarea'
 import { updateWhatsappSettings, searchWhatsappGroups } from '@/actions/whatsapp-settings'
 import type { WhatsappBotConfig, OutboundWebhook } from '@/lib/greenapi/config'
 import type { GreenApiGroup } from '@/lib/greenapi/client'
+import {
+  DEFAULT_COMPLAINT_PROMPT,
+  DEFAULT_COOPERATION_REPLY,
+  DEFAULT_DOUBT_RESULT_REPLY,
+  DEFAULT_FIRST_USE_EFFECT,
+  DEFAULT_LOW_STOCK_CTA,
+  DEFAULT_ORDER_CHECKLIST,
+  DEFAULT_PRODUCT_INFO,
+} from '@/lib/greenapi/default-templates'
 
-// Ярлыки и подсказки для шаблонов — соответствуют константам в
-// src/lib/greenapi/bot-reply.ts (и дублирующим в src/lib/amocrm/bot-reply.ts,
-// пока каналы не объединены в общий модуль).
-const TEMPLATE_FIELDS: { key: keyof WhatsappBotConfig['templates']; label: string; hint: string }[] = [
-  { key: 'productInfo', label: 'Знакомство (первое сообщение)', hint: 'Отправляется новому клиенту или по рекламной ссылке' },
-  { key: 'orderChecklist', label: 'Чек-лист оформления заказа', hint: 'Клиент подтвердил заказ — что от него нужно' },
-  { key: 'doubtResult', label: 'Ответ на сомнения ("не мошенники?")', hint: 'Обязательна фраза-гарантия по ТЗ, если меняете текст' },
-  { key: 'firstUseEffect', label: 'Эффект с первого применения', hint: 'После подтверждения города/доставки, тоже озвучивается голосом' },
-  { key: 'lowStockCta', label: 'CTA «мало на складе»', hint: 'Дожим после эффекта, если скидка ещё не обсуждалась' },
-  { key: 'complaintPrompt', label: 'Реакция на жалобу', hint: 'Клиент недоволен — уточняющий вопрос' },
-  { key: 'cooperationReply', label: 'Ответ на предложение сотрудничества', hint: 'Опт/дилерство — передаём менеджеру' },
+// Ярлыки, подсказки и реальный текст по умолчанию для шаблонов — тексты
+// синхронизированы вручную с src/lib/greenapi/default-templates.ts (общий
+// файл, его же читает bot-reply.ts, чтобы этот список не разошёлся с тем,
+// что реально уходит клиенту).
+const TEMPLATE_FIELDS: { key: keyof WhatsappBotConfig['templates']; label: string; hint: string; fallback: string }[] = [
+  { key: 'productInfo', label: 'Знакомство (первое сообщение)', hint: 'Отправляется новому клиенту или по рекламной ссылке', fallback: DEFAULT_PRODUCT_INFO },
+  { key: 'orderChecklist', label: 'Чек-лист оформления заказа', hint: 'Клиент подтвердил заказ — что от него нужно', fallback: DEFAULT_ORDER_CHECKLIST },
+  { key: 'doubtResult', label: 'Ответ на сомнения ("не мошенники?")', hint: 'Обязательна фраза-гарантия по ТЗ, если меняете текст', fallback: DEFAULT_DOUBT_RESULT_REPLY },
+  { key: 'firstUseEffect', label: 'Эффект с первого применения', hint: 'После подтверждения города/доставки, тоже озвучивается голосом', fallback: DEFAULT_FIRST_USE_EFFECT },
+  { key: 'lowStockCta', label: 'CTA «мало на складе»', hint: 'Дожим после эффекта, если скидка ещё не обсуждалась', fallback: DEFAULT_LOW_STOCK_CTA },
+  { key: 'complaintPrompt', label: 'Реакция на жалобу', hint: 'Клиент недоволен — уточняющий вопрос', fallback: DEFAULT_COMPLAINT_PROMPT },
+  { key: 'cooperationReply', label: 'Ответ на предложение сотрудничества', hint: 'Опт/дилерство — передаём менеджеру', fallback: DEFAULT_COOPERATION_REPLY },
 ]
 
 export default function WhatsappSettingsClient({ initialConfig }: { initialConfig: WhatsappBotConfig }) {
@@ -84,7 +94,7 @@ export default function WhatsappSettingsClient({ initialConfig }: { initialConfi
         <section className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-black/5 md:p-7">
           <h2 className="text-lg font-bold" style={{ color: 'var(--ink)' }}>Шаблоны сообщений</h2>
           <p className="mt-1 text-sm" style={{ color: 'var(--ink-3)' }}>
-            Пусто — используется текст по умолчанию из кода бота.
+            Текущий текст, который реально уходит клиенту, — редактируйте прямо здесь.
           </p>
           <div className="mt-5 space-y-5">
             {TEMPLATE_FIELDS.map((field) => (
@@ -92,14 +102,13 @@ export default function WhatsappSettingsClient({ initialConfig }: { initialConfi
                 <Label>{field.label}</Label>
                 <p className="text-xs" style={{ color: 'var(--ink-3)' }}>{field.hint}</p>
                 <Textarea
-                  value={config.templates[field.key] ?? ''}
+                  value={config.templates[field.key] ?? field.fallback}
                   onChange={(event) =>
                     setConfig((prev) => ({ ...prev, templates: { ...prev.templates, [field.key]: event.target.value } }))
                   }
                   onBlur={(event) =>
                     save({ templates: { ...config.templates, [field.key]: event.target.value } }, 'Шаблон сохранён')
                   }
-                  placeholder="По умолчанию из кода"
                   className="min-h-20 resize-y text-sm leading-relaxed"
                 />
               </div>

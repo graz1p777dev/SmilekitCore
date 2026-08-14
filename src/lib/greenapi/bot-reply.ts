@@ -21,6 +21,15 @@ import { advanceDealFromBotAction } from '@/lib/deals/advance-stage'
 import { ingestOrder } from '@/lib/orders/ingest'
 import { decrementStock, getWhatsappBotConfig } from '@/lib/greenapi/config'
 import {
+  DEFAULT_COMPLAINT_PROMPT,
+  DEFAULT_COOPERATION_REPLY,
+  DEFAULT_DOUBT_RESULT_REPLY,
+  DEFAULT_FIRST_USE_EFFECT,
+  DEFAULT_LOW_STOCK_CTA,
+  DEFAULT_ORDER_CHECKLIST,
+  DEFAULT_PRODUCT_INFO,
+} from '@/lib/greenapi/default-templates'
+import {
   sendGreenApiDeliveryGroupFile,
   sendGreenApiFileByUrl,
   sendGreenApiMessage,
@@ -119,11 +128,7 @@ async function transcribeGreenApiVoice(input: InboundGreenApiMessage): Promise<s
 // (src/lib/amocrm/bot-reply.ts), держим синхронно вручную до объединения
 // в общий модуль (см. задачу «обобщить bot-reply.ts под мульти-провайдера»).
 
-const PRODUCT_INFO =
-  'Здравствуйте! 😊\n\n' +
-  'SmileKit помогает заметно отбелить зубы уже после первого применения.\n\n' +
-  '📦 В наборе 14 отбеливающих полосок — это полный курс.\n\n' +
-  '💰 ЦЕНА — 1490 СОМ.🇰🇬'
+const PRODUCT_INFO = DEFAULT_PRODUCT_INFO
 
 const KYRGYZ_PRODUCT_INFO =
   'Салам! 😊 Бир кутусу — 1490 сом. Ичинде 14 даана тилке бар — бул толук курс. ' +
@@ -138,18 +143,11 @@ const GREETING_ONLY = /^\s*(?:улыбка|здравствуйте|здравс
 
 const CITY_QUESTION = 'Подскажите, пожалуйста, из какого вы города?'
 
-const FIRST_USE_EFFECT =
-  'Гарантированно увидите эффект с первого раза 😁. После курса эффект будет постоянный✅😊'
+const FIRST_USE_EFFECT = DEFAULT_FIRST_USE_EFFECT
 
-const LOW_STOCK_DISCOUNT_CTA =
-  'Кстати, у нас осталось буквально 2 упаковки, поэтому мы их отдаем по скидке 10% ☺️\n' +
-  'Оформить вам доставку ?)'
+const LOW_STOCK_DISCOUNT_CTA = DEFAULT_LOW_STOCK_CTA
 
-const ORDER_CHECKLIST =
-  'Чтобы оформить заказ, пожалуйста, отправьте 😊\n\n' +
-  '• чек об оплате;\n\n' +
-  '• адрес доставки;\n\n' +
-  '• номер телефона.'
+const ORDER_CHECKLIST = DEFAULT_ORDER_CHECKLIST
 
 const RETURNING_GREETING_REPLIES = [
   'Здравствуйте! 😊 Рада снова вас видеть. Чем могу помочь?',
@@ -162,10 +160,9 @@ const RETURNING_KYRGYZ_GREETING_REPLIES = [
   'Салам! 😊 Мен байланышта элем. Эмне боюнча жардам керек?',
 ]
 
-const COMPLAINT_PROMPT = 'Подскажите, пожалуйста, что вас не устроило — для улучшения нашего сервиса.'
+const COMPLAINT_PROMPT = DEFAULT_COMPLAINT_PROMPT
 
-const COOPERATION_REPLY =
-  'Спасибо за интерес! Вопросами сотрудничества и опта занимается наш менеджер — он свяжется с вами в ближайшее время.'
+const COOPERATION_REPLY = DEFAULT_COOPERATION_REPLY
 
 const DELIVERY_TEMPLATES: [RegExp, string][] = [
   [/бишкек|токмок/, 'Отлично, у нас есть доставка через Яндекс, за 30 минут доставим'],
@@ -226,12 +223,7 @@ const RESULT_PHOTOS: readonly (readonly [string, string])[] = [
   ['resultotzyv.jpeg', ''],
 ]
 
-const SMILEKIT_RESULTS_URL = 'https://smilekit.vercel.app/#results'
-
-const DOUBT_RESULT_REPLY =
-  'Понимаю, лучше один раз увидеть 😊 Вот страница с настоящими фото до/после ' +
-  `и перепиской с нашими покупателями — без прикрас: ${SMILEKIT_RESULTS_URL}\n\n` +
-  'Мы гарантируем эффект уже после первого применения.'
+const DOUBT_RESULT_REPLY = DEFAULT_DOUBT_RESULT_REPLY
 
 const SCAM_DOUBT =
   /(?:вы\s+)?(?:точно\s+)?не\s+мошенник|мошенники\s*\?|(?:это\s+)?(?:точно\s+)?не\s+(?:обман|развод|скам|фейк)|без\s+обмана|(?:это\s+)?(?:все|всё)?\s*реально\s*(?:да|\?)|не\s+кин[её]те|вам\s+можно\s+доверять|можно\s+(?:ли\s+)?вам\s+верить|вы\s+настоящие/i
