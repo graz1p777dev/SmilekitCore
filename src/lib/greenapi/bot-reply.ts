@@ -164,12 +164,17 @@ const COMPLAINT_PROMPT = DEFAULT_COMPLAINT_PROMPT
 
 const COOPERATION_REPLY = DEFAULT_COOPERATION_REPLY
 
+// Регионы Кыргызстана/Казахстана вне Бишкека/Токмока едут одной и той же
+// «Ылдам Экспресс» — этот же текст служит и явным совпадением по городу,
+// и запасным вариантом для сёл/малых населённых пунктов, которых нет и не
+// может быть в списке regex (см. REGIONAL_DELIVERY_FALLBACK ниже): раньше
+// такие случаи (например, «Село.Арчалы») уходили в ИИ, который сам выдумывал
+// сроки и стоимость доставки — теперь только заранее утверждённый текст.
+const REGIONAL_DELIVERY_TEMPLATE = 'Да, у нас есть доставка через Ылдам Экспресс 🚚✅ За 1 день доставим прям до дома.'
+
 const DELIVERY_TEMPLATES: [RegExp, string][] = [
   [/бишкек|токмок/, 'Отлично, у нас есть доставка через Яндекс, за 30 минут доставим'],
-  [
-    /\bош\b|джалал-?абад|каракол|нарын|талас|баткен|балыкч|манас/,
-    'Да, у нас есть доставка через Ылдам Экспресс 🚚✅. Если оформить сейчас, доставка будет уже завтра или послезавтра',
-  ],
+  [/\bош\b|джалал-?абад|каракол|нарын|талас|баткен|балыкч|манас/, REGIONAL_DELIVERY_TEMPLATE],
   [/алмат/, 'Да, доставим! В Алматы — ориентировочно в течение 30 минут'],
   [/астан/, 'Да, доставим! По остальным регионам Казахстана — ориентировочно за 1–3 дня'],
   [/ташкент/, 'Да, доставим! В Ташкенте — ориентировочно в течение 1 часа'],
@@ -719,8 +724,13 @@ async function processInboundGreenApiMessageNow(input: InboundGreenApiMessage): 
   let sendPaymentQr = false
   let needsFollowupAnchor = false
   let stageAction: string | null = null
-  const deliveryTemplate = deliveryTemplateForCity(input.text)
   const priceKnown = historyText.includes('цена') || historyText.includes('сом')
+  const looksLikeLocationAnswer = shouldSendResultsAfterLocation(input.text, historyText)
+  // Город не совпал ни с одним regex (село, малый нас. пункт) — но раз это
+  // похоже на ответ про город/доставку, шлём заранее утверждённый
+  // региональный шаблон, а не отдаём вопрос ИИ: тот сам выдумывал сроки и
+  // стоимость доставки под конкретное название (см. живой пример «Арчалы»).
+  const deliveryTemplate = deliveryTemplateForCity(input.text) ?? (looksLikeLocationAnswer ? REGIONAL_DELIVERY_TEMPLATE : null)
 
   // Блок «после города» (доставка + фото + голосовое + CTA) уходит ровно один
   // раз за чат — как claim_event в Telegram. Условия-триггеры остаются
@@ -728,8 +738,7 @@ async function processInboundGreenApiMessageNow(input: InboundGreenApiMessage): 
   // короткий ответ проходит shouldSendResultsAfterLocation. Без общей
   // защиты бот повторял голосовое «эффект с первого раза» уже во время
   // оформления заказа — не к месту.
-  const wantsResultsBlock =
-    shouldSendResultsAfterLocation(input.text, historyText) || Boolean(deliveryTemplate && priceKnown)
+  const wantsResultsBlock = looksLikeLocationAnswer || Boolean(deliveryTemplate && priceKnown)
   const resultsBlockAllowed = wantsResultsBlock ? await claimResultsBlock(supabase, input.chatId) : false
 
   const lastBotMessage = [...history].reverse().find((item) => item.role === 'assistant')?.content ?? ''
