@@ -108,7 +108,7 @@ export default function OrdersView({
         <div>
           <h1 className="text-xl font-bold" style={{ color: 'var(--ink)' }}>Заказы</h1>
           <p className="mt-0.5 text-sm" style={{ color: 'var(--ink-3)' }}>
-            Заказы, оформленные клиентами в Telegram-боте. Пустые поля бот не выдумывает —
+            Заказы, оформленные клиентами в Telegram- и WhatsApp-боте. Пустые поля бот не выдумывает —
             их уточняет менеджер.
           </p>
         </div>
