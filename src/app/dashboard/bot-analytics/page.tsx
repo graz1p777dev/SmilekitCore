@@ -1,26 +1,110 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { botGet } from '@/lib/bot-api'
+// Старая версия ходила через /api/backend → BOT_BACKEND_API_URL — бэкенд из
+// шаблона-форка DemiResults, которого у SmileKit никогда не было (переменная
+// не задана → ECONNREFUSED → «нет данных» с первого дня, не сбой на днях).
+// У реального бота (aiogram, smilekit_bot/api.py) нет такой ручки и нет самой
+// модели данных (approve/reject лидов) — строим аналитику из того, что
+// реально есть: amocrm_messages (переписка) и orders (заказы).
+
+import { useEffect, useMemo, useState } from 'react'
+import { createClient } from '@/lib/supabase/client'
+
+const LOOKBACK_DAYS = 30
+const BISHKEK_TZ = 'Asia/Bishkek'
+
+type MessageRow = { chat_id: string; sender: string; text: string; created_at: string }
+type OrderRow = { total_amount: number | null; currency: string | null }
 
 type Analytics = {
+  conversations: number
+  totalClient: number
+  totalBot: number
+  totalOperator: number
+  takeoverChats: number
+  ordersCount: number
+  ordersSum: number
+  daily: { date: string; client: number; bot: number }[]
   hourly: { hour: number; count: number }[]
-  daily: { date: string; count: number }[]
-  top_problems: { problem: string; count: number }[]
-  usage_by_purpose: {
-    purpose: string; prompt_tokens: number; completion_tokens: number
-    total_tokens: number; total_cost: number; calls: number
-  }[]
-  stats: {
-    total_leads: number; total_messages: number; total_approvals: number
-    approved: number; approved_as_is: number; rejected: number
-    consultation_confirmed: number
-    prompt_tokens: number; completion_tokens: number; total_tokens: number; total_cost: number
-  }
+  topics: { label: string; count: number }[]
 }
 
-type TokenStat = { tokens: number; cost: number }
-type TokenStats = { today: TokenStat; avg_day: TokenStat; avg_month: TokenStat; year: TokenStat; all_time: TokenStat }
+const TOPIC_PATTERNS: [string, RegExp][] = [
+  ['Цена', /цена|наркы|сколько стоит|стоимост|канча/i],
+  ['Доставка', /достав|привез|отправ|жеткир/i],
+  ['Оплата', /оплат|перевод|\bqr\b|карт/i],
+  ['Скидка', /скидк|акци/i],
+  ['Сомнения / не мошенники', /мошенник|обман|развод|скам|доверя/i],
+  ['Жалобы', /жалоб|верните|разочарован|ужасн|не помог/i],
+  ['Сотрудничество / опт', /сотрудничеств|\bопт\b|дилер|партн[её]р|реселлер/i],
+  ['Город / адрес', /город|адрес|бишкек|\bош\b|токмок|каракол/i],
+]
+
+function bishkekDate(iso: string): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: BISHKEK_TZ }).format(new Date(iso))
+}
+function bishkekHour(iso: string): number {
+  return Number(new Intl.DateTimeFormat('en-GB', { timeZone: BISHKEK_TZ, hour: '2-digit', hour12: false }).format(new Date(iso)))
+}
+
+function computeAnalytics(messages: MessageRow[], orders: OrderRow[]): Analytics {
+  const conversationSet = new Set<string>()
+  const takeoverSet = new Set<string>()
+  let totalClient = 0, totalBot = 0, totalOperator = 0
+
+  const dailyMap = new Map<string, { client: number; bot: number }>()
+  const hourlyMap = new Map<number, number>()
+  for (let h = 0; h < 24; h++) hourlyMap.set(h, 0)
+  const topicCounts = new Map<string, number>(TOPIC_PATTERNS.map(([label]) => [label, 0]))
+
+  for (const m of messages) {
+    conversationSet.add(m.chat_id)
+    if (m.sender === 'operator') takeoverSet.add(m.chat_id)
+    if (m.sender === 'client') totalClient++
+    else if (m.sender === 'bot') totalBot++
+    else if (m.sender === 'operator') totalOperator++
+
+    const day = bishkekDate(m.created_at)
+    const entry = dailyMap.get(day) ?? { client: 0, bot: 0 }
+    if (m.sender === 'client') entry.client++
+    if (m.sender === 'bot') entry.bot++
+    dailyMap.set(day, entry)
+
+    if (m.sender === 'client') {
+      hourlyMap.set(bishkekHour(m.created_at), (hourlyMap.get(bishkekHour(m.created_at)) ?? 0) + 1)
+    }
+  }
+
+  // Темы считаем по последним 2000 сообщениям клиента — на весь массив
+  // регэкспы гонять незачем, а порядок величины не меняется.
+  const clientTexts = messages.filter((m) => m.sender === 'client')
+  for (const m of clientTexts) {
+    for (const [label, pattern] of TOPIC_PATTERNS) {
+      if (pattern.test(m.text ?? '')) {
+        topicCounts.set(label, (topicCounts.get(label) ?? 0) + 1)
+      }
+    }
+  }
+
+  const daily = [...dailyMap.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([date, v]) => ({ date, client: v.client, bot: v.bot }))
+
+  const ordersSum = orders.reduce((sum, o) => sum + Number(o.total_amount ?? 0), 0)
+
+  return {
+    conversations: conversationSet.size,
+    totalClient,
+    totalBot,
+    totalOperator,
+    takeoverChats: takeoverSet.size,
+    ordersCount: orders.length,
+    ordersSum,
+    daily,
+    hourly: [...hourlyMap.entries()].sort((a, b) => a[0] - b[0]).map(([hour, count]) => ({ hour, count })),
+    topics: [...topicCounts.entries()].map(([label, count]) => ({ label, count })).sort((a, b) => b.count - a.count),
+  }
+}
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -33,80 +117,93 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
 
 export default function BotAnalyticsPage() {
   const [data, setData] = useState<Analytics | null>(null)
-  const [tokens, setTokens] = useState<TokenStats | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    Promise.allSettled([
-      botGet<Analytics>('/admin/analytics'),
-      botGet<TokenStats>('/admin/analytics/tokens'),
-    ]).then(([a, t]) => {
-      if (a.status === 'fulfilled') setData(a.value)
-      if (t.status === 'fulfilled') setTokens(t.value)
-      setLoading(false)
-    })
+    const supabase = createClient()
+    const since = new Date(Date.now() - LOOKBACK_DAYS * 86400_000).toISOString()
+
+    Promise.all([
+      supabase
+        .from('amocrm_messages')
+        .select('chat_id, sender, text, created_at')
+        .gte('created_at', since)
+        .not('chat_id', 'like', '%@g.us') // групповой чат доставки — не переписка с клиентом
+        .limit(20000),
+      supabase
+        .from('orders')
+        .select('total_amount, currency')
+        .gte('created_at', since),
+    ])
+      .then(([messagesRes, ordersRes]) => {
+        if (messagesRes.error) throw messagesRes.error
+        if (ordersRes.error) throw ordersRes.error
+        setData(computeAnalytics(messagesRes.data as MessageRow[], (ordersRes.data ?? []) as OrderRow[]))
+      })
+      .catch((err) => setError(err instanceof Error ? err.message : 'Ошибка загрузки'))
+      .finally(() => setLoading(false))
   }, [])
 
+  const maxHour = useMemo(() => Math.max(...(data?.hourly.map((h) => h.count) ?? [1]), 1), [data])
+  const maxDaily = useMemo(
+    () => Math.max(...(data?.daily.flatMap((d) => [d.client, d.bot]) ?? [1]), 1),
+    [data]
+  )
+  const maxTopic = useMemo(() => Math.max(...(data?.topics.map((t) => t.count) ?? [1]), 1), [data])
+
   if (loading) return <p className="p-8 text-sm" style={{ color: '#6b6063' }}>Загрузка аналитики...</p>
-  if (!data) return <p className="p-8 text-sm" style={{ color: '#6b6063' }}>Нет данных (бот-бэкенд недоступен)</p>
+  if (error) return <p className="p-8 text-sm" style={{ color: '#b91c1c' }}>Ошибка: {error}</p>
+  if (!data) return <p className="p-8 text-sm" style={{ color: '#6b6063' }}>Нет данных</p>
+
+  const takeoverRate = data.conversations ? Math.round((data.takeoverChats / data.conversations) * 100) : 0
+  const conversionRate = data.conversations ? Math.round((data.ordersCount / data.conversations) * 100) : 0
 
   const statCards = [
-    { label: 'Лидов', value: data.stats.total_leads, color: '#5115a4' },
-    { label: 'Сообщений', value: data.stats.total_messages, color: '#5115a4' },
-    { label: 'AI ответов', value: data.stats.total_approvals, color: '#047857' },
-    { label: 'Принято', value: data.stats.approved, color: '#b45309' },
-    { label: 'Без правок', value: data.stats.approved_as_is, color: '#b5491f' },
-    { label: 'Отклонено', value: data.stats.rejected, color: '#5115a4' },
-    { label: 'Записей', value: data.stats.consultation_confirmed, color: '#5115a4' },
+    { label: `Диалогов за ${LOOKBACK_DAYS} дн.`, value: data.conversations, color: '#5115a4' },
+    { label: 'Сообщений клиентов', value: data.totalClient, color: '#5115a4' },
+    { label: 'Ответов бота', value: data.totalBot, color: '#047857' },
+    { label: 'Ответов менеджера', value: data.totalOperator, color: '#b45309' },
+    { label: 'Перехвачено менеджером', value: `${data.takeoverChats} (${takeoverRate}%)`, color: '#b91c1c' },
+    { label: 'Заказов', value: data.ordersCount, color: '#5115a4' },
+    { label: 'Конверсия в заказ', value: `${conversionRate}%`, color: '#047857' },
+    { label: 'Сумма заказов', value: `${data.ordersSum.toLocaleString('ru-RU')} сом`, color: '#5115a4' },
   ]
-
-  const tokenCards = tokens ? [
-    { label: 'Сегодня', s: tokens.today, color: '#5115a4' },
-    { label: 'Средний в день', s: tokens.avg_day, color: '#5115a4' },
-    { label: 'За месяц (30 дн.)', s: tokens.avg_month, color: '#5115a4' },
-    { label: 'За год', s: tokens.year, color: '#b45309' },
-    { label: 'За всё время', s: tokens.all_time, color: '#047857' },
-  ] : []
-
-  const maxProblem = Math.max(...data.top_problems.map(p => p.count), 1)
-  const maxHour = Math.max(...data.hourly.map(h => h.count), 1)
 
   return (
     <div className="p-4 md:p-8 flex flex-col gap-5">
-      {/* Основные метрики */}
-      <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))' }}>
-        {statCards.map(s => (
+      <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))' }}>
+        {statCards.map((s) => (
           <div key={s.label} className="rounded-2xl bg-white px-4 py-3.5">
-            <div className="text-xl font-bold" style={{ color: s.color }}>{s.value.toLocaleString('ru-RU')}</div>
+            <div className="text-xl font-bold" style={{ color: s.color }}>
+              {typeof s.value === 'number' ? s.value.toLocaleString('ru-RU') : s.value}
+            </div>
             <div className="text-xs mt-0.5" style={{ color: '#6b6063' }}>{s.label}</div>
           </div>
         ))}
       </div>
 
-      {/* Токены по периодам */}
-      {tokens && (
-        <Card title="Расход токенов по периодам">
-          <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))' }}>
-            {tokenCards.map(t => (
-              <div key={t.label} className="rounded-xl px-4 py-3" style={{ backgroundColor: '#fdfbfb' }}>
-                <div className="text-base font-bold" style={{ color: t.color }}>
-                  {t.s.tokens.toLocaleString('ru-RU')} <span className="text-xs font-medium">tok</span>
-                </div>
-                <div className="text-sm font-semibold" style={{ color: '#1b1517' }}>
-                  ${t.s.cost.toFixed(t.s.cost >= 1 ? 2 : 4)}
-                </div>
-                <div className="text-xs mt-1" style={{ color: '#6b6063' }}>{t.label}</div>
+      <Card title={`Сообщения по дням (последние ${LOOKBACK_DAYS} дн.)`}>
+        <div className="flex items-end gap-1" style={{ height: 140 }}>
+          {data.daily.map((d) => (
+            <div key={d.date} className="flex-1 flex flex-col items-center justify-end h-full gap-0.5" title={`${d.date}: клиент ${d.client}, бот ${d.bot}`}>
+              <div className="w-full flex flex-col justify-end gap-0.5" style={{ height: '100%' }}>
+                <div className="w-full rounded-t" style={{ height: `${Math.max((d.bot / maxDaily) * 100, d.bot ? 2 : 0)}%`, backgroundColor: '#047857' }} />
+                <div className="w-full rounded-t" style={{ height: `${Math.max((d.client / maxDaily) * 100, d.client ? 2 : 0)}%`, backgroundColor: '#5115a4' }} />
               </div>
-            ))}
-          </div>
-        </Card>
-      )}
+            </div>
+          ))}
+        </div>
+        <div className="flex gap-4 mt-3 text-xs" style={{ color: '#6b6063' }}>
+          <span><span className="inline-block w-2.5 h-2.5 rounded-sm mr-1" style={{ backgroundColor: '#5115a4' }} />клиент</span>
+          <span><span className="inline-block w-2.5 h-2.5 rounded-sm mr-1" style={{ backgroundColor: '#047857' }} />бот</span>
+        </div>
+      </Card>
 
       <div className="grid gap-5 md:grid-cols-2">
-        {/* Активность по часам */}
-        <Card title="Активность клиентов по часам">
+        <Card title="Активность клиентов по часам (Бишкек)">
           <div className="flex items-end gap-0.5" style={{ height: 120 }}>
-            {data.hourly.map(h => (
+            {data.hourly.map((h) => (
               <div key={h.hour} className="flex-1 flex flex-col items-center justify-end h-full" title={`${h.hour}:00 — ${h.count} сообщ.`}>
                 <div className="w-full rounded-t" style={{
                   height: `${Math.max((h.count / maxHour) * 100, 2)}%`,
@@ -118,50 +215,23 @@ export default function BotAnalyticsPage() {
           </div>
         </Card>
 
-        {/* Топ проблем */}
-        <Card title="Проблемы клиентов">
-          {data.top_problems.length === 0 && <p className="text-sm" style={{ color: '#6b6063' }}>Нет данных</p>}
+        <Card title="О чём спрашивают клиенты">
+          {data.topics.every((t) => t.count === 0) && <p className="text-sm" style={{ color: '#6b6063' }}>Нет данных</p>}
           <div className="flex flex-col gap-2.5">
-            {data.top_problems.slice(0, 8).map(p => (
-              <div key={p.problem}>
+            {data.topics.filter((t) => t.count > 0).map((t) => (
+              <div key={t.label}>
                 <div className="flex justify-between text-xs mb-1">
-                  <span style={{ color: '#1b1517' }}>{p.problem}</span>
-                  <span style={{ color: '#6b6063' }}>{p.count}</span>
+                  <span style={{ color: '#1b1517' }}>{t.label}</span>
+                  <span style={{ color: '#6b6063' }}>{t.count}</span>
                 </div>
                 <div className="h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: '#fdfbfb' }}>
-                  <div className="h-full rounded-full" style={{ width: `${(p.count / maxProblem) * 100}%`, backgroundColor: '#5115a4' }} />
+                  <div className="h-full rounded-full" style={{ width: `${(t.count / maxTopic) * 100}%`, backgroundColor: '#5115a4' }} />
                 </div>
               </div>
             ))}
           </div>
         </Card>
       </div>
-
-      {/* Расход по задачам */}
-      <Card title="Расход токенов по задачам ИИ">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm" style={{ borderCollapse: 'collapse' }}>
-            <thead>
-              <tr className="text-xs uppercase" style={{ color: '#6b6063' }}>
-                <th className="text-left py-2 pr-3 font-medium">Задача</th>
-                <th className="text-right py-2 px-3 font-medium">Вызовов</th>
-                <th className="text-right py-2 px-3 font-medium">Токенов</th>
-                <th className="text-right py-2 pl-3 font-medium">Стоимость</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.usage_by_purpose.map(u => (
-                <tr key={u.purpose} style={{ borderTop: '1px solid #fdfbfb' }}>
-                  <td className="py-2 pr-3" style={{ color: '#1b1517' }}>{u.purpose}</td>
-                  <td className="py-2 px-3 text-right" style={{ color: '#6b6063' }}>{u.calls.toLocaleString('ru-RU')}</td>
-                  <td className="py-2 px-3 text-right" style={{ color: '#1b1517' }}>{u.total_tokens.toLocaleString('ru-RU')}</td>
-                  <td className="py-2 pl-3 text-right font-medium" style={{ color: '#047857' }}>${u.total_cost.toFixed(4)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Card>
     </div>
   )
 }
