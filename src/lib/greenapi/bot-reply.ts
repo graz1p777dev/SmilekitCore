@@ -250,13 +250,22 @@ function stageActionForInbound(text: string): string | null {
  * с чужим providerMessageId) — живой менеджер написал в WhatsApp напрямую. */
 export async function registerOutgoingGreenApiMessage(input: InboundGreenApiMessage): Promise<void> {
   const supabase = createAdminClient()
+  // Окно эха расширено с 5 минут до суток: под нагрузкой (см. AmoBotToggle,
+  // getDealConversation — тот же класс зависаний сервера) собственная
+  // отправка бота иногда фактически уходит клиенту с большой задержкой —
+  // на живых данных зафиксирован разрыв 21+ минуту между сообщением клиента
+  // и приходом эха. Опоздавшее эхо не находило себе пару в 5-минутном окне
+  // и записывалось как сообщение живого менеджера — бот замолкал в этом
+  // чате НАВСЕГДА (isManagerControllingChat), хотя ответил он сам. Точное
+  // совпадение текста практически исключает случайное совпадение с реальным
+  // сообщением человека.
   const { data: recentBot } = await supabase
     .from('amocrm_messages')
     .select('id')
     .eq('chat_id', input.chatId)
     .eq('sender', 'bot')
     .eq('text', input.text)
-    .gte('created_at', new Date(Date.now() - 5 * 60_000).toISOString())
+    .gte('created_at', new Date(Date.now() - 24 * 3600_000).toISOString())
     .limit(1)
   if (recentBot?.length) return // эхо нашей же отправки
 
