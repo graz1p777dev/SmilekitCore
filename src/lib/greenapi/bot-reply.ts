@@ -206,6 +206,9 @@ const ORDER_INTENT =
 // вместо чек-листа получал произвольную формулировку.
 const AFFIRMATIVE_ONLY =
   /^\s*(?:да|ага|угу|давай(?:те)?|ок(?:ей)?|хорошо|конечно|согласен|согласна|можно)[\s!.,)😊👍]*$/i
+// Ответ «нет» на follow-up ORDER_CTA_FOLLOWUP_TEXT — единственный триггер
+// скидки 13%: до follow-up скидку не предлагаем вовсе.
+const NEGATIVE_ONLY = /^\s*(?:нет|неа|не\s+хочу|не\s+буду|не\s+надо|откажусь|подумаю)[\s!.,)😔👎]*$/i
 // ИИ формулирует призыв по-разному: «Оформить вам?», «Вам оформить доставку?»,
 // «Оформить?» — привязка к точному порядку слов не работала, и согласие
 // клиента уходило в ИИ вместо чек-листа.
@@ -214,13 +217,22 @@ const ORDER_CTA_MARKER = /оформ\w*[^.!?]*\?/i
 // Подводка перед фото — дословно как в Telegram (__main__.py).
 const RESULTS_INTRO = 'Вот результат нашего клиента до и после применения 👇'
 
+// После блока результата скидку больше не предлагаем сразу — только вопрос
+// «вам оформить?» через 5 минут молчания (followup-scheduler.ts), а скидка —
+// только если клиент на этот вопрос ответил отказом (NEGATIVE_ONLY ниже).
+export const ORDER_CTA_FOLLOWUP_TEXT = 'Вам оформить? Пока есть в наличии.'
+// Маркер-якорь для followup-scheduler.ts: последняя запись в чате с этим
+// текстом и sender='bot' — сигнал «ждём 5 минут тишины клиента». Как только
+// появляется любое следующее сообщение (клиент ответил или сам follow-up
+// ушёл), якорь перестаёт быть последней записью и больше не триггерит.
+export const FOLLOWUP_ANCHOR_TEXT = '[ожидание оформления]'
+
 // Тот же набор, что уходит альбомом в Telegram (media.result_photo_group).
 // WhatsApp альбомов не поддерживает — шлём по одному; подписи «До»/«После»
 // нужны, потому что без album-группировки порядок иначе не читается.
 const RESULT_PHOTOS: readonly (readonly [string, string])[] = [
   ['before.jpg', 'До'],
   ['after.jpg', 'После'],
-  ['resultotzyv.jpeg', ''],
 ]
 
 const DOUBT_RESULT_REPLY = DEFAULT_DOUBT_RESULT_REPLY
@@ -373,7 +385,7 @@ function isPhoneAllowedForBot(chatId: string): boolean {
   return allowed.length === 0 || allowed.includes(chatId.replace(/\D/g, ''))
 }
 
-async function canSendGreenApiBotReply(
+export async function canSendGreenApiBotReply(
   supabase: ReturnType<typeof createAdminClient>,
   chatId: string
 ): Promise<boolean> {
@@ -706,6 +718,7 @@ async function processInboundGreenApiMessageNow(input: InboundGreenApiMessage): 
   // записанными файлами (assets/voice в боте), текст остаётся тем же.
   const voiceReplies = new Set<string>()
   let sendPaymentQr = false
+  let needsFollowupAnchor = false
   let stageAction: string | null = null
   const deliveryTemplate = deliveryTemplateForCity(input.text)
   const priceKnown = historyText.includes('цена') || historyText.includes('сом')
@@ -774,6 +787,10 @@ async function processInboundGreenApiMessageNow(input: InboundGreenApiMessage): 
     replies.push(T.complaintPrompt)
   } else if (COOPERATION.test(input.text)) {
     replies.push(T.cooperationReply)
+  } else if (NEGATIVE_ONLY.test(input.text) && lastBotMessage === ORDER_CTA_FOLLOWUP_TEXT) {
+    // Клиент отказался оформлять на follow-up «вам оформить?» — только
+    // здесь и появляется скидка 13%, сразу после результата её не шлём.
+    replies.push(T.lowStockCta)
   } else if (ORDER_INTENT.test(input.text) || acceptedOrderCta) {
     // QR отправляется сразу вместе с чек-листом (ниже, sendPaymentQr) — раньше
     // WhatsApp не умел слать картинки, поэтому клиента отправляли к менеджеру
@@ -784,8 +801,8 @@ async function processInboundGreenApiMessageNow(input: InboundGreenApiMessage): 
     stageAction = 'order'
   } else if (deliveryTemplate && priceKnown && resultsBlockAllowed) {
     replies.push(deliveryTemplate, T.firstUseEffect)
-    replies.push(historyText.includes('скидк') ? 'Оформить вам? Пока есть в наличии.' : T.lowStockCta)
     voiceReplies.add(T.firstUseEffect)
+    needsFollowupAnchor = true
   }
 
   if (replies.length === 0) {
@@ -926,6 +943,18 @@ async function processInboundGreenApiMessageNow(input: InboundGreenApiMessage): 
     if (index < replies.length - 1) {
       await new Promise((resolve) => setTimeout(resolve, 900 + Math.random() * 500))
     }
+  }
+
+  if (needsFollowupAnchor) {
+    // DB-only маркер (не отправляется клиенту) — followup-scheduler.ts раз в
+    // минуту ищет чаты, где это последняя запись и прошло 5+ минут.
+    await supabase.from('amocrm_messages').upsert({
+      amo_message_id: `ga:claim:followup-anchor:${input.chatId}:${input.providerMessageId}`,
+      chat_id: input.chatId,
+      direction: 'out',
+      sender: 'bot',
+      text: FOLLOWUP_ANCHOR_TEXT,
+    }, { onConflict: 'amo_message_id', ignoreDuplicates: true })
   }
 
   if (stageAction) {

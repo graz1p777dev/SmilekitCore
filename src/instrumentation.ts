@@ -16,5 +16,7 @@ export async function register() {
     }
     const { startCampaignScheduler } = await import('@/lib/campaigns/scheduler')
     startCampaignScheduler()
+    const { startFollowupScheduler } = await import('@/lib/greenapi/followup-scheduler')
+    startFollowupScheduler()
   }
 }
