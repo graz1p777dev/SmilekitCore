@@ -157,7 +157,7 @@ export default function DealModal({
       if (!alive) return
       alive = false
       setMessages([])
-      setChatNote('amoCRM не ответила вовремя. Нажмите «Повторить».')
+      setChatNote('Сервер не ответил вовремя. Нажмите «Повторить».')
     }, 12_000)
     void getDealConversation(deal.id)
       .then((res) => {
