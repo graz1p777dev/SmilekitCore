@@ -231,8 +231,7 @@ export const FOLLOWUP_ANCHOR_TEXT = '[ожидание оформления]'
 // WhatsApp альбомов не поддерживает — шлём по одному; подписи «До»/«После»
 // нужны, потому что без album-группировки порядок иначе не читается.
 const RESULT_PHOTOS: readonly (readonly [string, string])[] = [
-  ['before.jpg', 'До'],
-  ['after.jpg', 'После'],
+  ['before_after.jpg', ''],
 ]
 
 const DOUBT_RESULT_REPLY = DEFAULT_DOUBT_RESULT_REPLY
