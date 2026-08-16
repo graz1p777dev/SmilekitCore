@@ -16,7 +16,10 @@ export async function register() {
     }
     const { startCampaignScheduler } = await import('@/lib/campaigns/scheduler')
     startCampaignScheduler()
-    const { startFollowupScheduler } = await import('@/lib/greenapi/followup-scheduler')
+    // Импорт манифеста регистрирует интеграции — планировщику нужен
+    // зарегистрированный канал, чтобы отправлять через ядро.
+    const { startFollowupScheduler } = await import('@/integrations/greenapi')
+    await import('@/integrations')
     startFollowupScheduler()
   }
 }

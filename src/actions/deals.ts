@@ -389,7 +389,7 @@ export interface DealConversation {
 }
 
 // Ссылка на вложение (чек, фото) хранится маркером в конце text — отдельной
-// колонки под медиа в amocrm_messages нет (см. src/lib/greenapi/bot-reply.ts).
+// колонки под медиа в amocrm_messages нет (см. src/integrations/greenapi/).
 const MEDIA_MARKER = /\n\[media\](\S+)$/
 
 function toDealMessages(rows: {
@@ -529,7 +529,7 @@ async function loadDealConversation(dealId: string): Promise<DealConversation> {
 
   if (deal.external_key?.startsWith('greenapi:')) {
     // WhatsApp через Green API: chat_id — номер телефона, история в той же
-    // amocrm_messages (см. src/lib/greenapi/bot-reply.ts).
+    // amocrm_messages (см. src/integrations/greenapi/).
     const phone = deal.external_key.slice('greenapi:'.length)
     const admin = createAdminClient()
     const { data: rows } = await admin

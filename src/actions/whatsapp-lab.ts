@@ -2,18 +2,19 @@
 
 // Песочница для теста WhatsApp-канала (Green API): в отличие от
 // /dashboard/laboratory (тестирует только AI-ядро менеджер+супервизор без
-// сценариев), здесь гоняется РЕАЛЬНЫЙ пайплайн bot-reply.ts — тот же самый
+// сценариев), здесь гоняется РЕАЛЬНЫЙ пайплайн ядра — тот же самый
 // код, что обрабатывает настоящие сообщения клиентов: скрипт продаж, блок
 // результата с фото, доставка по городу, QR оплаты, свои правила из
 // настроек, follow-up-скидка. Отличия от прода — только opts:
-// skipIntegrationCheck (не завязано на общий аварийный выключатель бота —
+// skipKillSwitch (не завязано на общий аварийный выключатель бота —
 // можно тестировать, даже когда бот выключен для реальных клиентов) и
 // dryRun (ничего не уходит в реальный Green API и не создаёт сделки в
 // воронке — тестовый chat_id никогда не пересекается с настоящими номерами).
 
 import { randomUUID } from 'crypto'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { processInboundGreenApiMessage } from '@/lib/greenapi/bot-reply'
+import { receive } from '@/core'
+import '@/integrations'
 
 export interface WhatsappLabMessage {
   sender: 'client' | 'bot'
@@ -59,16 +60,17 @@ export async function sendWhatsappLabMessage(
 
   const effectiveChatId = chatId || newLabChatId()
   try {
-    await processInboundGreenApiMessage(
+    await receive(
+      'greenapi',
       {
         providerMessageId: `lab:${randomUUID()}`,
         chatId: effectiveChatId,
         authorName: 'Тест (Лаборатория)',
         text: trimmed,
-        messageType: 'text',
+        kind: 'text',
         mediaUrl: null,
       },
-      { skipIntegrationCheck: true, dryRun: true }
+      { skipKillSwitch: true, dryRun: true }
     )
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : 'Ошибка бота' }

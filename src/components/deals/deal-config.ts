@@ -21,7 +21,7 @@ export const DEAL_SOURCE: Record<DealSource, DealSourceMeta> = {
   site:      { label: 'Сайт',      icon: Globe,         color: '#0e7490', bg: '#cffafe' },
   manual:    { label: 'Вручную',   icon: PenLine,       color: '#574d4f', bg: '#f0eaea' },
   // Технически 'amocrm' — старые сделки, заведённые до переезда WhatsApp-
-  // канала с amoCRM на Green API (см. src/lib/greenapi/bot-reply.ts).
+  // канала с amoCRM на Green API (см. src/integrations/greenapi/).
   // Канал у клиента один и тот же — WhatsApp, отдельная метка вводит в
   // заблуждение, поэтому визуально это тот же бейдж, что у 'whatsapp'.
   amocrm:    { label: 'WhatsApp',  icon: MessageCircle, color: '#15803d', bg: '#dcfce7' },

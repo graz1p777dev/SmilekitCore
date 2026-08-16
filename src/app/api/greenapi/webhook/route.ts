@@ -1,73 +1,31 @@
+// Вебхук Green API.
+//
+// Маршрут делает ровно три вещи: проверяет подпись, разбирает тело и отдаёт
+// сообщение ядру. Вся обработка (очередь, дедупликация, история, бот) идёт
+// фоном — вебхуку важно ответить 200 быстро, иначе провайдер начнёт слать
+// повторы.
+//
+// Импорт '@/integrations' обязателен: он же и есть регистрация каналов.
+
 import { NextRequest, NextResponse } from 'next/server'
-import { phoneFromGreenApiChatId } from '@/lib/greenapi/client'
-import { processInboundGreenApiMessage, registerOutgoingGreenApiMessage } from '@/lib/greenapi/bot-reply'
-
-// Green API шлёт Authorization: Bearer <webhookUrlToken> (см. setGreenApiWebhook).
-function isAuthorized(request: NextRequest): boolean {
-  const expected = process.env.GREENAPI_WEBHOOK_TOKEN
-  const header = request.headers.get('authorization') || ''
-  return Boolean(expected) && header === `Bearer ${expected}`
-}
-
-interface GreenApiWebhookBody {
-  typeWebhook: string
-  idMessage?: string
-  senderData?: { chatId?: string; sender?: string; senderName?: string; chatName?: string }
-  messageData?: {
-    typeMessage?: string
-    textMessageData?: { textMessage?: string }
-    extendedTextMessageData?: { text?: string }
-    fileMessageData?: { downloadUrl?: string; caption?: string; mimeType?: string }
-  }
-}
-
-function extractText(body: GreenApiWebhookBody): string {
-  const data = body.messageData
-  return (
-    data?.textMessageData?.textMessage ??
-    data?.extendedTextMessageData?.text ??
-    data?.fileMessageData?.caption ??
-    ''
-  ).trim()
-}
+import { receive, receiveOperatorMessage } from '@/core'
+import '@/integrations'
+import { isAuthorized, parseWebhook, type GreenApiWebhookBody } from '@/integrations/greenapi'
 
 export async function POST(request: NextRequest) {
-  if (!isAuthorized(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  // Green API шлёт Authorization: Bearer <webhookUrlToken> (см. setGreenApiWebhook).
+  if (!isAuthorized(request.headers.get('authorization'))) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
 
   const body = (await request.json().catch(() => null)) as GreenApiWebhookBody | null
   if (!body) return NextResponse.json({ error: 'invalid_json' }, { status: 400 })
 
-  const chatId = body.senderData?.chatId
-  const providerMessageId = body.idMessage
-  if (!chatId || !providerMessageId) return NextResponse.json({ ok: true }) // служебные события без сообщения
-
-  const phone = phoneFromGreenApiChatId(chatId)
-  const typeMessage = body.messageData?.typeMessage ?? ''
-  const text = extractText(body)
-  const authorName = body.senderData?.senderName || body.senderData?.chatName || null
-
-  if (body.typeWebhook === 'incomingMessageReceived') {
-    // Голосовые и картинки приходят без текста, но обрабатываются
-    // (расшифровка речи и проверка чека) — отбрасываем только то, где нет ни
-    // текста, ни файла.
-    const hasMedia = Boolean(body.messageData?.fileMessageData?.downloadUrl)
-    if (!text && !hasMedia) return NextResponse.json({ ok: true })
-    void processInboundGreenApiMessage({
-      providerMessageId,
-      chatId: phone,
-      authorName,
-      text,
-      messageType: typeMessage,
-      mediaUrl: body.messageData?.fileMessageData?.downloadUrl ?? null,
-    })
-  } else if (body.typeWebhook === 'outgoingMessageReceived') {
-    // Только сообщения, отправленные с самого телефона — это живой менеджер.
-    // outgoingAPIMessageReceived сюда не попадает: через API шлём только мы,
-    // и раньше собственное эхо бота (подводка перед фото) записывалось как
-    // менеджер — бот замолкал в чате посреди своей же отправки.
-    if (text) {
-      void registerOutgoingGreenApiMessage({ providerMessageId, chatId: phone, authorName, text })
-    }
+  const parsed = parseWebhook(body)
+  if (parsed.type === 'inbound') {
+    void receive('greenapi', parsed.message)
+  } else if (parsed.type === 'operator') {
+    void receiveOperatorMessage('greenapi', parsed.message)
   }
 
   return NextResponse.json({ ok: true })

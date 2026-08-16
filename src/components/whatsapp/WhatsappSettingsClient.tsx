@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { updateWhatsappSettings, searchWhatsappGroups } from '@/actions/whatsapp-settings'
-import type { WhatsappBotConfig, OutboundWebhook, CustomRule } from '@/lib/greenapi/config'
+import type { GreenApiConfig as WhatsappBotConfig, OutboundWebhook, CustomRule } from '@/integrations/greenapi/config'
 import type { GreenApiGroup } from '@/lib/greenapi/client'
 import {
   DEFAULT_COMPLAINT_PROMPT,
@@ -38,7 +38,7 @@ const TEMPLATE_FIELDS: { key: keyof WhatsappBotConfig['templates']; label: strin
 // Копируется по кнопке «Скопировать инструкцию для LLM» — вставляется в
 // ChatGPT/другую модель вместе с описанием бизнеса, ответ вставляется в
 // JSON-режим этой страницы. Схема должна буквально совпадать с
-// WhatsappBotConfig (src/lib/greenapi/config.ts) — при изменении типа
+// WhatsappBotConfig (src/integrations/greenapi/config.ts) — при изменении типа
 // обновите и этот текст, иначе сгенерированный JSON не пройдёт валидацию.
 const LLM_INSTRUCTION = `Сгенерируй JSON-конфиг для WhatsApp-бота продаж по следующей схеме (TypeScript-тип):
 

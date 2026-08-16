@@ -2,12 +2,12 @@
 
 // Настройки WhatsApp-канала (Green API): шаблоны сообщений, группа доставки,
 // внешние CRM-вебхуки, товароучёт. Хранение — settings.extra, см.
-// src/lib/greenapi/config.ts. Доступ только владельцу — тот же уровень,
+// src/integrations/greenapi/config.ts. Доступ только владельцу — тот же уровень,
 // что у промптов бота (bot-settings).
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import { getWhatsappBotConfig, saveWhatsappBotConfig, type WhatsappBotConfig } from '@/lib/greenapi/config'
+import { greenapiConfig, type GreenApiConfig as WhatsappBotConfig } from '@/integrations/greenapi/config'
 import { listGreenApiGroups, type GreenApiGroup } from '@/lib/greenapi/client'
 
 async function requireOwner(): Promise<boolean> {
@@ -25,16 +25,17 @@ async function requireOwner(): Promise<boolean> {
 
 export async function getWhatsappSettings(): Promise<WhatsappBotConfig | null> {
   if (!(await requireOwner())) return null
-  return getWhatsappBotConfig()
+  return greenapiConfig.get()
 }
 
 export async function updateWhatsappSettings(
   patch: Partial<WhatsappBotConfig>
 ): Promise<{ success: true } | { success: false; error: string }> {
   if (!(await requireOwner())) return { success: false, error: 'Нет доступа' }
-  const result = await saveWhatsappBotConfig(patch)
-  if (result.success) revalidatePath('/dashboard/whatsapp-settings')
-  return result
+  const result = await greenapiConfig.save(patch)
+  if (!result.ok) return { success: false, error: result.error }
+  revalidatePath('/dashboard/whatsapp-settings')
+  return { success: true }
 }
 
 export async function searchWhatsappGroups(query: string): Promise<

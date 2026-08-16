@@ -206,7 +206,7 @@ async function eligibleRecipients(filter?: AudienceFilter): Promise<Recipient[]>
     }
     if (deal.source === 'whatsapp' && key.startsWith('greenapi:')) {
       // Сделки, заведённые уже напрямую через Green API (без amoCRM в
-      // цепочке, см. resolveGreenApiExternalKey в src/lib/greenapi/bot-reply.ts).
+      // цепочке, см. resolveGreenApiExternalKey в src/integrations/greenapi/).
       // Раньше этой ветки не было вовсе — такие сделки не попадали ни в одну
       // рассылку, независимо от выбранной аудитории.
       const phone = key.slice('greenapi:'.length)
