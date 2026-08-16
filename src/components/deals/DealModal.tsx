@@ -44,6 +44,8 @@ interface Props {
   me: DealViewer
   onClose: () => void
   onSaved: () => void
+  /** Открыть карточку клиента по телефону — вся история человека. */
+  onOpenCustomer?: (phone: string) => void
 }
 
 interface FormState {
@@ -103,6 +105,7 @@ export default function DealModal({
   employees,
   me,
   onClose,
+  onOpenCustomer,
   onSaved,
 }: Props) {
   const [isPending, startTransition] = useTransition()
@@ -402,7 +405,19 @@ export default function DealModal({
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Телефон</Label>
+              <div className="flex items-center justify-between">
+                <Label>Телефон</Label>
+                {onOpenCustomer && form.customer_phone.replace(/\D/g, '').length >= 6 && (
+                  <button
+                    type="button"
+                    onClick={() => onOpenCustomer(form.customer_phone)}
+                    className="text-[11px] font-semibold transition-opacity hover:opacity-80"
+                    style={{ color: 'var(--brand-ink)' }}
+                  >
+                    Карточка клиента →
+                  </button>
+                )}
+              </div>
               <Input
                 value={form.customer_phone}
                 onChange={(e) => set('customer_phone', e.target.value)}

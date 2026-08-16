@@ -1,16 +1,18 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
-import { Plus, RefreshCw, Search } from 'lucide-react'
+import { GripVertical, Plus, RefreshCw, Search } from 'lucide-react'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import { formatMoney } from '@/lib/formatters'
 import type { Deal, DealEmployee, DealStage, DealViewer } from '@/types'
 import { getDealsData, moveDeal, reconcileDealsFromShop } from '@/actions/deals'
+import { renameStage, reorderStages, updateStageDescription } from '@/actions/stages'
 import { stageSoft } from './deal-config'
 import DealCard from './DealCard'
 import DealModal from './DealModal'
+import CustomerCardModal from './CustomerCardModal'
 import { AmoBotToggle } from './AmoBotToggle'
 
 interface Props {
@@ -64,11 +66,37 @@ export default function DealsBoard({ initialStages, initialDeals, employees, me,
     if (target) setModal({ open: true, deal: target, isNew: false, stageId: target.stage_id })
   }, [initialOpenDealId, initialDeals])
 
-  const stages = initialStages
+  // Этапы — состояние, а не константа: владелец перетаскивает колонки
+  // прямо на доске (как настройка воронки в amoCRM).
+  const [stages, setStages] = useState<DealStage[]>(initialStages)
+  const [dragStageId, setDragStageId] = useState<string | null>(null)
+  const [customerPhone, setCustomerPhone] = useState<string | null>(null)
+  const canEditStages = me.role === 'owner'
   const defaultStageId = useMemo(
     () => stages.find((s) => s.is_default)?.id ?? stages[0]?.id ?? '',
     [stages]
   )
+
+  /** Колонку бросили на колонку targetId — этап встаёт на её место. */
+  const dropStage = (targetId: string) => {
+    const fromId = dragStageId
+    setDragStageId(null)
+    if (!fromId || fromId === targetId) return
+    const snapshot = stages
+    const next = [...stages]
+    const from = next.findIndex((s) => s.id === fromId)
+    const to = next.findIndex((s) => s.id === targetId)
+    if (from < 0 || to < 0) return
+    const [moved] = next.splice(from, 1)
+    next.splice(to, 0, moved)
+    setStages(next)
+    void reorderStages(next.map((s) => s.id)).then((res) => {
+      if (!res.success) {
+        toast.error(res.error)
+        setStages(snapshot)
+      }
+    })
+  }
 
   // Realtime-подписка живёт вне рендера, а знать о текущем перетаскивании ей
   // нужно — держим id и в состоянии (для отрисовки), и в ref (для колбэка).
@@ -245,32 +273,51 @@ export default function DealsBoard({ initialStages, initialDeals, employees, me,
             <div
               key={stage.id}
               onDragOver={(e) => {
-                if (!dragId) return
+                if (!dragId && !dragStageId) return
                 e.preventDefault()
-                setDragOverStage(stage.id)
+                if (dragId) setDragOverStage(stage.id)
               }}
               onDrop={(e) => {
                 e.preventDefault()
+                if (dragStageId) {
+                  dropStage(stage.id)
+                  return
+                }
                 void performDrop(stage.id)
               }}
               className={cn(
                 'flex w-[290px] shrink-0 flex-col rounded-2xl border transition-colors',
+                dragStageId === stage.id && 'opacity-60',
                 isTarget && dragId
-                  ? 'border-[#cdb8e8] bg-[var(--brand-soft)]/60'
-                  : 'border-gray-100 bg-gray-50/60'
+                  ? 'border-[var(--brand)] bg-[var(--brand-soft)]'
+                  : 'border-[var(--line)] bg-[var(--surface-2)]/50'
               )}
+              style={{ borderTop: `2px solid ${stage.color}` }}
             >
-              {/* Заголовок колонки */}
-              <div className="px-3 py-3">
+              {/* Заголовок колонки. Владелец перетаскивает этап за шапку —
+                  порядок воронки правится с доски, как в amoCRM. */}
+              <div
+                className={cn('px-3 py-3', canEditStages && 'cursor-grab active:cursor-grabbing')}
+                draggable={canEditStages}
+                onDragStart={(e) => {
+                  if (!canEditStages) return
+                  e.stopPropagation()
+                  setDragStageId(stage.id)
+                }}
+                onDragEnd={() => setDragStageId(null)}
+              >
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex min-w-0 items-center gap-2">
+                    {canEditStages && (
+                      <GripVertical size={13} className="shrink-0 opacity-40" style={{ color: 'var(--ink-4)' }} />
+                    )}
                     <span
                       className="h-2.5 w-2.5 shrink-0 rounded-full"
                       style={{ background: stage.color }}
                     />
-                    <span className="truncate text-[13px] font-semibold text-gray-700">
-                      {stage.name}
-                    </span>
+                    <StageName stage={stage} editable={canEditStages} onRenamed={(name) =>
+                      setStages((prev) => prev.map((s) => (s.id === stage.id ? { ...s, name } : s)))
+                    } />
                     <span
                       className="shrink-0 rounded-full px-1.5 text-[11px] font-semibold"
                       style={{ color: stage.color, background: stageSoft(stage.color) }}
@@ -280,13 +327,17 @@ export default function DealsBoard({ initialStages, initialDeals, employees, me,
                   </div>
                   <button
                     onClick={() => openNew(stage.id)}
-                    className="rounded-lg p-1 text-gray-400 transition-colors hover:bg-card hover:text-gray-600"
+                    className="rounded-lg p-1 transition-colors hover:bg-[var(--surface-3)]"
+                    style={{ color: 'var(--ink-4)' }}
                     title="Добавить в этап"
                   >
                     <Plus size={15} />
                   </button>
                 </div>
-                <p className="mt-1 truncate text-[11px] text-gray-400">
+                <StageDescription stage={stage} editable={canEditStages} onSaved={(description) =>
+                  setStages((prev) => prev.map((s) => (s.id === stage.id ? { ...s, description } : s)))
+                } />
+                <p className="mt-1 truncate text-[11px]" style={{ color: 'var(--ink-4)' }}>
                   {totals.length ? totals.join(' · ') : 'Без суммы'}
                 </p>
               </div>
@@ -332,8 +383,141 @@ export default function DealsBoard({ initialStages, initialDeals, employees, me,
           me={me}
           onClose={closeModal}
           onSaved={refresh}
+          onOpenCustomer={(phone) => setCustomerPhone(phone)}
+        />
+      )}
+
+      {customerPhone && (
+        <CustomerCardModal
+          key={customerPhone}
+          phone={customerPhone}
+          stages={stages}
+          onClose={() => setCustomerPhone(null)}
+          onOpenDeal={(dealId) => {
+            setCustomerPhone(null)
+            const target = deals.find((d) => d.id === dealId)
+            if (target) setModal({ open: true, deal: target, isNew: false, stageId: target.stage_id })
+          }}
         />
       )}
     </div>
+  )
+}
+
+// ─── Настройка этапа с доски ────────────────────────────────────────────────
+
+/** Название: двойной клик — переименовать (только владелец). */
+function StageName({ stage, editable, onRenamed }: {
+  stage: DealStage
+  editable: boolean
+  onRenamed: (name: string) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(stage.name)
+
+  if (!editing) {
+    return (
+      <span
+        className="truncate text-[13px] font-semibold"
+        style={{ color: 'var(--ink-2)' }}
+        onDoubleClick={() => {
+          if (!editable) return
+          setDraft(stage.name)
+          setEditing(true)
+        }}
+        title={editable ? 'Двойной клик — переименовать' : undefined}
+      >
+        {stage.name}
+      </span>
+    )
+  }
+
+  const commit = () => {
+    setEditing(false)
+    const value = draft.trim()
+    if (!value || value === stage.name) return
+    onRenamed(value)
+    void renameStage(stage.id, value).then((res) => {
+      if (!res.success) {
+        toast.error(res.error)
+        onRenamed(stage.name)
+      }
+    })
+  }
+
+  return (
+    <input
+      autoFocus
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') commit()
+        if (e.key === 'Escape') setEditing(false)
+      }}
+      className="w-full min-w-0 rounded-md border px-1.5 py-0.5 text-[13px] font-semibold outline-none"
+      style={{ borderColor: 'var(--brand)', background: 'var(--surface)', color: 'var(--ink)' }}
+    />
+  )
+}
+
+/** Описание этапа: что это за шаг воронки. Клик — редактировать. */
+function StageDescription({ stage, editable, onSaved }: {
+  stage: DealStage
+  editable: boolean
+  onSaved: (description: string | null) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(stage.description ?? '')
+
+  if (!editing) {
+    if (!stage.description && !editable) return null
+    return (
+      <p
+        className={cn('mt-1 line-clamp-2 text-[11px] leading-snug', editable && 'cursor-text')}
+        style={{ color: stage.description ? 'var(--ink-3)' : 'var(--ink-4)' }}
+        onClick={() => {
+          if (!editable) return
+          setDraft(stage.description ?? '')
+          setEditing(true)
+        }}
+        title={editable ? 'Нажмите, чтобы изменить описание этапа' : stage.description ?? undefined}
+      >
+        {stage.description || '+ описание этапа'}
+      </p>
+    )
+  }
+
+  const commit = () => {
+    setEditing(false)
+    const value = draft.trim()
+    if (value === (stage.description ?? '')) return
+    onSaved(value || null)
+    void updateStageDescription(stage.id, value).then((res) => {
+      if (!res.success) {
+        toast.error(res.error)
+        onSaved(stage.description)
+      }
+    })
+  }
+
+  return (
+    <textarea
+      autoFocus
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault()
+          commit()
+        }
+        if (e.key === 'Escape') setEditing(false)
+      }}
+      rows={2}
+      placeholder="Когда сделка попадает в этот этап"
+      className="mt-1 w-full resize-none rounded-md border px-1.5 py-1 text-[11px] leading-snug outline-none"
+      style={{ borderColor: 'var(--brand)', background: 'var(--surface)', color: 'var(--ink)' }}
+    />
   )
 }

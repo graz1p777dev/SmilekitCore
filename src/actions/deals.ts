@@ -85,21 +85,30 @@ export async function getDealsData(): Promise<DealsData> {
   if (!me) return { stages: [], deals: [], employees: [], me: null }
 
   const supabase = await createClient()
-  const admin = createAdminClient()
 
   // deal_stages/deals — через RLS-клиент: какие сделки видны, решает БД.
-  // employees — через admin: имена нужны для пикера ответственного.
-  const [{ data: stages }, deals, { data: emps }] = await Promise.all([
+  // employees — через admin: имена нужны для пикера ответственного. Без
+  // service-ключа (локальная среда) доска работает, просто без пикера.
+  const fetchEmployees = async () => {
+    try {
+      const { data } = await createAdminClient()
+        .from('employees')
+        .select('id, name, avatar_url')
+        .is('deleted_at', null)
+        .order('name')
+      return data ?? []
+    } catch {
+      return []
+    }
+  }
+
+  const [{ data: stages }, deals, emps] = await Promise.all([
     supabase
       .from('deal_stages')
       .select('id, name, sort_order, kind, color, is_default, description')
       .order('sort_order'),
     fetchAllDeals(supabase),
-    admin
-      .from('employees')
-      .select('id, name, avatar_url')
-      .is('deleted_at', null)
-      .order('name'),
+    fetchEmployees(),
   ])
 
   return {
