@@ -58,6 +58,14 @@ export async function sendWhatsappLabMessage(
   const trimmed = text.trim()
   if (!trimmed) return { success: false, error: 'Введите сообщение' }
 
+  // chatId приходит из браузера, поэтому проверяем формат: без этого можно
+  // подставить настоящий номер клиента и записать «ответы бота» в его живую
+  // переписку (отправки не будет — dryRun, но история окажется испорчена,
+  // а менеджер увидит сообщения, которых клиенту никто не слал).
+  if (chatId && !/^lab-[a-f0-9]{12}$/.test(chatId)) {
+    return { success: false, error: 'Некорректный идентификатор тестового чата' }
+  }
+
   const effectiveChatId = chatId || newLabChatId()
   try {
     await receive(

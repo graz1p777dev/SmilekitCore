@@ -162,6 +162,10 @@ export async function save(input: SaveVariableInput): Promise<{ ok: true } | { o
   if (input.isSecret && !isEncryptionConfigured()) {
     return { ok: false, error: 'INTEGRATION_ENCRYPTION_KEY не задана — секреты сохранять некуда' }
   }
+  // Переменная — это ключ, адрес или список номеров. Всё, что длиннее,
+  // почти наверняка вставлено по ошибке (файл, дамп) и только раздувает
+  // таблицу, которая читается на каждое сообщение.
+  if (input.value.length > 4096) return { ok: false, error: 'Значение длиннее 4096 символов' }
 
   const row = {
     name,

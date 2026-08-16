@@ -69,8 +69,11 @@ CREATE INDEX flow_rules_channel_idx ON public.flow_rules(channel, position);
 
 ALTER TABLE public.flow_rules ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "flow_rules_select" ON public.flow_rules
-  FOR SELECT TO authenticated USING (TRUE);
+-- Только владелец: в ветках лежат адреса вебхуков (иногда с токеном в query)
+-- и тексты, которыми бот говорит с клиентами. Это тот же уровень доступа,
+-- что у таблицы integrations, а не «читают все сотрудники».
+CREATE POLICY "flow_rules_select_owner" ON public.flow_rules
+  FOR SELECT TO authenticated USING (public.get_my_role() = 'owner');
 
 GRANT SELECT ON public.flow_rules TO authenticated;
 GRANT ALL ON public.flow_rules TO service_role;
@@ -101,8 +104,9 @@ CREATE INDEX flow_jobs_chat_idx ON public.flow_jobs(chat_id, status);
 
 ALTER TABLE public.flow_jobs ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "flow_jobs_select" ON public.flow_jobs
-  FOR SELECT TO authenticated USING (TRUE);
+-- В state лежит текст клиента — те же ограничения, что у переписки.
+CREATE POLICY "flow_jobs_select_owner" ON public.flow_jobs
+  FOR SELECT TO authenticated USING (public.get_my_role() = 'owner');
 
 GRANT SELECT ON public.flow_jobs TO authenticated;
 GRANT ALL ON public.flow_jobs TO service_role;

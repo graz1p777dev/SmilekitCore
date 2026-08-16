@@ -75,9 +75,24 @@ async function once<T>(url: string, options: RequestOptions): Promise<HttpResult
   }
 }
 
+/**
+ * Адрес для сообщения об ошибке: без query и без пути.
+ *
+ * Часть провайдеров кладёт секрет прямо в URL (Green API — токен инстанса
+ * куском пути), и такой адрес в тексте исключения оказывается в логах
+ * Railway, а оттуда — у всех, у кого есть доступ к логам.
+ */
+function safeUrlLabel(url: string): string {
+  try {
+    return new URL(url).origin
+  } catch {
+    return 'адрес'
+  }
+}
+
 export async function requestOrThrow<T>(url: string, options: RequestOptions = {}): Promise<T> {
   const result = await request<T>(url, options)
-  if (!result.ok) throw new Error(`${options.method ?? 'GET'} ${url}: ${result.error}`)
+  if (!result.ok) throw new Error(`${options.method ?? 'GET'} ${safeUrlLabel(url)}: ${result.error}`)
   return result.data
 }
 
