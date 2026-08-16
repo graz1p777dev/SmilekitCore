@@ -14,7 +14,7 @@ import { isAuthorized, parseWebhook, type GreenApiWebhookBody } from '@/integrat
 
 export async function POST(request: NextRequest) {
   // Green API шлёт Authorization: Bearer <webhookUrlToken> (см. setGreenApiWebhook).
-  if (!isAuthorized(request.headers.get('authorization'))) {
+  if (!(await isAuthorized(request.headers.get('authorization')))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

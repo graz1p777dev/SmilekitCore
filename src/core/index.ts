@@ -7,8 +7,21 @@
 // зависимость мимо границы.
 
 export { defineConfig, envList, listConfigs, requireEnv } from './config'
+export { vars, type VariableRow } from './variables'
+export { isEncryptionConfigured } from './crypto'
+export { runFlow, matchRule, executeActions, type FlowResult } from './flow/engine'
+export { activeRules, getRule, listRules, removeRule, saveRule, type SaveRuleInput } from './flow/store'
+export { startFlowScheduler } from './flow/jobs'
+export type {
+  FlowAction,
+  FlowActionType,
+  FlowCondition,
+  FlowRule,
+  ConditionField,
+  ConditionOp,
+} from './flow/types'
 export { emit, on, type CoreEvents } from './events'
-export { fetchBinary, request, requestOrThrow, type HttpResult, type RequestOptions } from './http'
+export { assertPublicHttpUrl, fetchBinary, request, requestOrThrow, type HttpResult, type RequestOptions } from './http'
 export { createLogger, log } from './logger'
 export { findStaleAnchors, type StaleAnchor } from './conversation'
 export { serial, sleep } from './queue'

@@ -13,7 +13,7 @@
 // Провайдер упал — это ошибка, её видно в логах, а не «странный ответ».
 
 import { log } from '../logger'
-import type { AiProvider, CompletionRequest, TranscribeRequest, VisionRequest } from '../types'
+import type { AiProvider, CompletionRequest, EnvSpec, TranscribeRequest, VisionRequest } from '../types'
 import { deepseek } from './providers/deepseek'
 import { gemini } from './providers/gemini'
 import { openai } from './providers/openai'
@@ -38,8 +38,16 @@ export function pick(capability: Capability): AiProvider | null {
   return providers().find((provider) => provider.isConfigured() && typeof provider[capability] === 'function') ?? null
 }
 
+export interface AiProviderStatus {
+  id: string
+  title: string
+  configured: boolean
+  can: Capability[]
+  env: Record<string, EnvSpec>
+}
+
 /** Кто что умеет прямо сейчас — для страницы состояния интеграций. */
-export function aiStatus(): { id: string; title: string; configured: boolean; can: Capability[] }[] {
+export function aiStatus(): AiProviderStatus[] {
   return ALL.map((provider) => ({
     id: provider.id,
     title: provider.title,
@@ -47,6 +55,7 @@ export function aiStatus(): { id: string; title: string; configured: boolean; ca
     can: (['complete', 'transcribe', 'vision'] as Capability[]).filter(
       (capability) => typeof provider[capability] === 'function'
     ),
+    env: provider.env ?? {},
   }))
 }
 

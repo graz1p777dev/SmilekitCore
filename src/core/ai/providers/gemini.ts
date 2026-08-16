@@ -2,17 +2,10 @@
 // отличается только тип inlineData.
 
 import { requestOrThrow } from '../../http'
+import { vars } from '../../variables'
 import type { AiProvider, CompletionRequest, TranscribeRequest, VisionRequest } from '../../types'
 
 const BASE = 'https://generativelanguage.googleapis.com/v1beta/models'
-
-function key(): string | undefined {
-  return process.env.GEMINI_API_KEY?.trim() || undefined
-}
-
-function model(): string {
-  return process.env.GEMINI_MODEL || 'gemini-2.0-flash'
-}
 
 interface GenerateResponse {
   candidates?: { content?: { parts?: { text?: string }[] } }[]
@@ -21,9 +14,10 @@ interface GenerateResponse {
 type Part = { text: string } | { inlineData: { mimeType: string; data: string } }
 
 async function generate(parts: Part[], options: { json?: boolean; system?: string; maxTokens?: number } = {}) {
+  const model = (await vars.get('GEMINI_MODEL')) || 'gemini-2.0-flash'
   // Ключ идёт заголовком, а не в query: в query он попадал бы в логи прокси.
-  const data = await requestOrThrow<GenerateResponse>(`${BASE}/${model()}:generateContent`, {
-    headers: { 'x-goog-api-key': key() as string },
+  const data = await requestOrThrow<GenerateResponse>(`${BASE}/${model}:generateContent`, {
+    headers: { 'x-goog-api-key': await vars.requireValue('GEMINI_API_KEY') },
     timeoutMs: 60_000,
     body: {
       contents: [{ role: 'user', parts }],
@@ -41,8 +35,12 @@ export const gemini: AiProvider = {
   id: 'gemini',
   kind: 'ai',
   title: 'Google Gemini',
+  env: {
+    GEMINI_API_KEY: { description: 'ключ API Google AI Studio', required: true },
+    GEMINI_MODEL: { description: 'модель, по умолчанию gemini-2.0-flash' },
+  },
 
-  isConfigured: () => Boolean(key()),
+  isConfigured: () => Boolean(vars.snapshot('GEMINI_API_KEY')),
 
   async complete(req: CompletionRequest) {
     // История склеивается в текст: у Gemini своя схема ролей, а ядру нужен

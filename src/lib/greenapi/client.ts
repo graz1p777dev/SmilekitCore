@@ -8,16 +8,34 @@
 // домен (доки прямо предупреждают: "using a host not intended for the
 // instance can break the integration").
 
-const ID_INSTANCE = process.env.GREENAPI_ID_INSTANCE
-const API_TOKEN_INSTANCE = process.env.GREENAPI_API_TOKEN_INSTANCE
-const API_URL = process.env.GREENAPI_API_URL?.replace(/\/$/, '')
-const MEDIA_URL = process.env.GREENAPI_MEDIA_URL?.replace(/\/$/, '')
+// Доступы читаются через ядро: сначала то, что владелец ввёл на странице
+// «Интеграции», затем переменные окружения. Поэтому конфиг больше не
+// вычисляется один раз при загрузке модуля — иначе правка из браузера
+// применялась бы только после перезапуска сервиса.
 
-function requireConfig(): { idInstance: string; apiTokenInstance: string; apiUrl: string } {
-  if (!ID_INSTANCE || !API_TOKEN_INSTANCE || !API_URL) {
-    throw new Error('GREENAPI_ID_INSTANCE / GREENAPI_API_TOKEN_INSTANCE / GREENAPI_API_URL не заданы')
+import { vars } from '@/core/variables'
+
+interface GreenApiCredentials {
+  idInstance: string
+  apiTokenInstance: string
+  apiUrl: string
+  mediaUrl: string
+}
+
+async function credentials(): Promise<GreenApiCredentials> {
+  const [idInstance, apiTokenInstance, apiUrl, mediaUrl] = await Promise.all([
+    vars.get('GREENAPI_ID_INSTANCE'),
+    vars.get('GREENAPI_API_TOKEN_INSTANCE'),
+    vars.get('GREENAPI_API_URL'),
+    vars.get('GREENAPI_MEDIA_URL'),
+  ])
+  if (!idInstance || !apiTokenInstance || !apiUrl) {
+    throw new Error(
+      'Не заданы GREENAPI_ID_INSTANCE / GREENAPI_API_TOKEN_INSTANCE / GREENAPI_API_URL — заполните в разделе «Интеграции»'
+    )
   }
-  return { idInstance: ID_INSTANCE, apiTokenInstance: API_TOKEN_INSTANCE, apiUrl: API_URL }
+  const api = apiUrl.replace(/\/$/, '')
+  return { idInstance, apiTokenInstance, apiUrl: api, mediaUrl: mediaUrl?.replace(/\/$/, '') || api }
 }
 
 /** Нормализует номер (в любом формате) в chatId WhatsApp: только цифры + '@c.us'. */
@@ -32,8 +50,8 @@ export function phoneFromGreenApiChatId(chatId: string): string {
 }
 
 async function callApi<T>(method: string, body?: Record<string, unknown>, base: 'api' | 'media' = 'api'): Promise<T> {
-  const { idInstance, apiTokenInstance, apiUrl } = requireConfig()
-  const host = base === 'media' ? (MEDIA_URL || apiUrl) : apiUrl
+  const { idInstance, apiTokenInstance, apiUrl, mediaUrl } = await credentials()
+  const host = base === 'media' ? mediaUrl : apiUrl
   const url = `${host}/waInstance${idInstance}/${method}/${apiTokenInstance}`
   const res = await fetch(url, {
     method: body ? 'POST' : 'GET',

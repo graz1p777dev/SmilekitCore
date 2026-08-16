@@ -10,6 +10,7 @@ import {
   sendGreenApiVoice,
   toGreenApiChatId,
 } from '@/lib/greenapi/client'
+import { vars } from '@/core/variables'
 import type { ChannelTransport, OutboundMessage } from '@/core'
 
 export const greenapiTransport: ChannelTransport = {
@@ -46,6 +47,7 @@ export const greenapiTransport: ChannelTransport = {
 }
 
 /** Базовый адрес медиафайлов бота (голосовые, фото результатов, QR). */
-export function mediaBaseUrl(): string | null {
-  return process.env.SMILEKIT_BOT_API_URL?.replace(/\/$/, '') || null
+export async function mediaBaseUrl(): Promise<string | null> {
+  const value = await vars.get('SMILEKIT_BOT_API_URL')
+  return value?.replace(/\/$/, '') || null
 }

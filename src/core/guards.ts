@@ -7,8 +7,8 @@
 // видеть переписку и воронку в любом случае.
 
 import { createAdminClient } from '@/lib/supabase/admin'
-import { envList } from './config'
 import { lastOperatorAt } from './conversation'
+import { vars } from './variables'
 import type { ChannelGuards } from './types'
 
 type Admin = ReturnType<typeof createAdminClient>
@@ -63,9 +63,9 @@ export async function optedOut(supabase: Admin, chatId: string): Promise<boolean
  * перечисленным. Остальным клиентам история и сделки ведутся как обычно.
  * Пустая переменная — обычный режим, отвечаем всем.
  */
-export function allowedByEnv(envName: string | undefined, chatId: string): boolean {
-  if (!envName) return true
-  const allowed = envList(envName).map((value) => value.replace(/\D/g, ''))
+export async function allowedByList(varName: string | undefined, chatId: string): Promise<boolean> {
+  if (!varName) return true
+  const allowed = (await vars.list(varName)).map((value) => value.replace(/\D/g, ''))
   return allowed.length === 0 || allowed.includes(chatId.replace(/\D/g, ''))
 }
 
@@ -81,7 +81,7 @@ export async function canReply(
   guards: ChannelGuards = {},
   options: GuardOptions = {}
 ): Promise<boolean> {
-  if (!allowedByEnv(guards.allowlistEnv, chatId)) return false
+  if (!(await allowedByList(guards.allowlistEnv, chatId))) return false
 
   const [switchOn, manager, blocked] = await Promise.all([
     guards.killSwitch && !options.skipKillSwitch ? killSwitchOn(supabase, guards.killSwitch) : Promise.resolve(true),

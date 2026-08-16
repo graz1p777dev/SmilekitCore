@@ -164,6 +164,18 @@ export async function isOwnEcho(chatId: string, text: string): Promise<boolean> 
   return Boolean(data?.length)
 }
 
+/** Писал ли клиент после этого момента — например, за время паузы в сценарии. */
+export async function hasClientMessageSince(chatId: string, since: string): Promise<boolean> {
+  const { data } = await admin()
+    .from(TABLE)
+    .select('id')
+    .eq('chat_id', chatId)
+    .eq('sender', 'client')
+    .gt('created_at', since)
+    .limit(1)
+  return Boolean(data?.length)
+}
+
 export interface StaleAnchor {
   id: number
   chatId: string

@@ -81,6 +81,27 @@ export async function requestOrThrow<T>(url: string, options: RequestOptions = {
   return result.data
 }
 
+// Адреса, по которым нельзя ходить с сервера: localhost, частные сети и
+// метаданные облака. Иначе вебхук, заданный из браузера, превращается в
+// инструмент чтения внутренней сети (SSRF).
+const PRIVATE_HOST = /^(localhost$|127\.|10\.|192\.168\.|169\.254\.|::1$|\[::1\]$|172\.(1[6-9]|2\d|3[01])\.)/i
+
+/**
+ * Проверка адреса, введённого пользователем. Только http(s) и только
+ * публичный хост. Бросает с понятным текстом — сообщение уходит в UI.
+ */
+export function assertPublicHttpUrl(value: string): URL {
+  let url: URL
+  try {
+    url = new URL(value)
+  } catch {
+    throw new Error('Некорректный адрес')
+  }
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') throw new Error('Разрешены только http и https')
+  if (PRIVATE_HOST.test(url.hostname)) throw new Error('Адреса внутренней сети запрещены')
+  return url
+}
+
 export interface BinaryFile {
   bytes: Buffer
   mime: string

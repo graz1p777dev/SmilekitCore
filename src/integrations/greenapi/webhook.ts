@@ -3,7 +3,9 @@
 // Вся «формоспецифичность» провайдера заканчивается здесь: дальше ядро видит
 // обычное сообщение с текстом, типом и ссылкой на вложение.
 
+import { timingSafeEqual } from 'crypto'
 import { phoneFromGreenApiChatId } from '@/lib/greenapi/client'
+import { vars } from '@/core/variables'
 import type { InboundMessage, MessageKind } from '@/core'
 
 export interface GreenApiWebhookBody {
@@ -21,9 +23,15 @@ export interface GreenApiWebhookBody {
 const VOICE_TYPES = new Set(['voice', 'audio', 'audioMessage'])
 const IMAGE_TYPES = new Set(['image', 'imageMessage', 'documentMessage'])
 
-export function isAuthorized(authorization: string | null): boolean {
-  const expected = process.env.GREENAPI_WEBHOOK_TOKEN
-  return Boolean(expected) && authorization === `Bearer ${expected}`
+export async function isAuthorized(authorization: string | null): Promise<boolean> {
+  const expected = await vars.get('GREENAPI_WEBHOOK_TOKEN')
+  if (!expected || !authorization) return false
+  // Сравнение постоянного времени: обычное === выходит из цикла на первом
+  // несовпавшем байте и по времени ответа подсказывает подбирающему, какой
+  // префикс он угадал.
+  const given = Buffer.from(authorization)
+  const want = Buffer.from(`Bearer ${expected}`)
+  return given.length === want.length && timingSafeEqual(given, want)
 }
 
 function extractText(body: GreenApiWebhookBody): string {

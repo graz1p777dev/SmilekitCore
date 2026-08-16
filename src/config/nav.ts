@@ -34,6 +34,8 @@ import {
   Handshake,
   Package,
   Send,
+  Workflow,
+  Plug,
 } from 'lucide-react'
 
 export const NAV_GROUPS: NavGroup[] = [
@@ -102,6 +104,21 @@ export const NAV_GROUPS: NavGroup[] = [
         href: '/dashboard/whatsapp-settings',
         label: 'WhatsApp: шаблоны и доставка',
         icon: SlidersHorizontal,
+        roles: ['owner'],
+      },
+      {
+        // Сценарии бота: «если клиент написал X → ответить, подождать,
+        // сделать». Собираются на канве, применяются без деплоя.
+        href: '/dashboard/flows',
+        label: 'Сценарии',
+        icon: Workflow,
+        roles: ['owner'],
+      },
+      {
+        // Подключение каналов и моделей: переменные, токены, включатели.
+        href: '/dashboard/integrations',
+        label: 'Интеграции',
+        icon: Plug,
         roles: ['owner'],
       },
       {

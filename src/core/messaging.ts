@@ -20,6 +20,7 @@ import { ai } from './ai'
 import * as store from './conversation'
 import { crm } from './crm'
 import { emit } from './events'
+import { runFlow } from './flow/engine'
 import { canReply as guardCanReply, type GuardOptions } from './guards'
 import { fetchBinary } from './http'
 import { createLogger } from './logger'
@@ -198,6 +199,13 @@ async function process(channel: AnyChannel, incoming: InboundMessage, options: R
   if (!allowed) return
 
   context.history = await store.history(message.chatId, { limit: HISTORY_LIMIT, excludeId: messageId })
+
+  // Сценарий, собранный владельцем на канве, идёт ПЕРЕД встроенным скриптом:
+  // правка из браузера должна побеждать зашитое поведение, иначе смысл
+  // конструктора теряется. Ветка со снятой галкой «остановить» пропускает
+  // разговор дальше по скрипту.
+  const flow = await runFlow(context)
+  if (flow.stop) return
 
   const replies = await channel.reply(context)
   for (const reply of replies) {

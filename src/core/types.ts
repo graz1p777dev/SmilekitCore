@@ -190,6 +190,8 @@ export interface AiProvider {
   id: string
   kind: 'ai'
   title: string
+  /** Переменные провайдера — показываются на странице «Интеграции». */
+  env?: Record<string, EnvSpec>
   isConfigured(): boolean
   complete?(req: CompletionRequest): Promise<string | null>
   transcribe?(req: TranscribeRequest): Promise<string | null>

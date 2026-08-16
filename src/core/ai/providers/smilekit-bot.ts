@@ -10,19 +10,15 @@
 // если бот недоступен.
 
 import { request } from '../../http'
+import { vars } from '../../variables'
 import type { AiProvider, CompletionRequest, TranscribeRequest } from '../../types'
 
-function base(): string | undefined {
-  return process.env.SMILEKIT_BOT_API_URL?.replace(/\/$/, '') || undefined
-}
-
-function token(): string | undefined {
-  return process.env.SMILEKIT_BOT_INTERNAL_TOKEN?.trim() || undefined
-}
-
 async function call<T>(path: string, body: unknown): Promise<T | null> {
-  const url = base()
-  const secret = token()
+  const [rawUrl, secret] = await Promise.all([
+    vars.get('SMILEKIT_BOT_API_URL'),
+    vars.get('SMILEKIT_BOT_INTERNAL_TOKEN'),
+  ])
+  const url = rawUrl?.replace(/\/$/, '')
   if (!url || !secret) return null
   const result = await request<T>(`${url}${path}`, {
     method: 'POST',
@@ -38,8 +34,13 @@ export const smilekitBot: AiProvider = {
   id: 'smilekit-bot',
   kind: 'ai',
   title: 'Бот SmileKit (/internal/lab)',
+  env: {
+    SMILEKIT_BOT_API_URL: { description: 'адрес бота на Railway', required: true },
+    SMILEKIT_BOT_INTERNAL_TOKEN: { description: 'общий секрет для /internal/*', required: true },
+  },
 
-  isConfigured: () => Boolean(base() && token()),
+  isConfigured: () =>
+    Boolean(vars.snapshot('SMILEKIT_BOT_API_URL') && vars.snapshot('SMILEKIT_BOT_INTERNAL_TOKEN')),
 
   async complete(req: CompletionRequest) {
     const data = await call<{ reply?: string }>('/internal/lab', {

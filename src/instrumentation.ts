@@ -16,10 +16,19 @@ export async function register() {
     }
     const { startCampaignScheduler } = await import('@/lib/campaigns/scheduler')
     startCampaignScheduler()
-    // Импорт манифеста регистрирует интеграции — планировщику нужен
+    // Импорт манифеста регистрирует интеграции — планировщикам нужен
     // зарегистрированный канал, чтобы отправлять через ядро.
     const { startFollowupScheduler } = await import('@/integrations/greenapi')
     await import('@/integrations')
     startFollowupScheduler()
+
+    // Переменные, заданные на сайте, попадают в синхронный кэш до первого
+    // сообщения — иначе страницы состояния на старте покажут «не настроено».
+    const { vars } = await import('@/core/variables')
+    void vars.warmup().catch((error) => console.error('[core] прогрев переменных не удался', error))
+
+    // Отложенные шаги сценариев с канвы («Подождать N минут»).
+    const { startFlowScheduler } = await import('@/core/flow/jobs')
+    startFlowScheduler()
   }
 }

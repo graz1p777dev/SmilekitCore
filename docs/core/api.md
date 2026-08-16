@@ -204,6 +204,43 @@ envList('ALLOWED_PHONES')       // 'a,b,c' → ['a','b','c']
 
 ---
 
+## Переменные
+
+Значение берётся из базы (введено на странице «Интеграции»), а если там пусто —
+из переменной окружения.
+
+```ts
+await vars.get('GREENAPI_API_URL')          // string | undefined
+await vars.requireValue('OPENAI_API_KEY')   // бросает с понятным текстом
+await vars.list('GREENAPI_ALLOWED_PHONES')  // 'a,b' → ['a','b']
+vars.snapshot('OPENAI_API_KEY')             // синхронно, из кэша (для isConfigured)
+await vars.warmup()                         // прогрев кэша при старте
+
+await vars.save({ name: 'MY_TOKEN', value: '…', isSecret: true })
+await vars.listAll()                        // для UI: секреты уже замаскированы
+```
+
+Секреты шифруются AES-256-GCM ключом `INTEGRATION_ENCRYPTION_KEY`. Подробности —
+[panel-and-flows.md](./panel-and-flows.md).
+
+---
+
+## Сценарии
+
+```ts
+await runFlow(ctx)                       // вызывается ядром в конвейере приёма
+matchRule(rule, matchInput)              // «примерка» без побочных эффектов
+await listRules('greenapi')              // все ветки канала
+await saveRule({ ... }); await removeRule(id)
+startFlowScheduler()                     // планировщик отложенных шагов
+```
+
+Модель ветки (`FlowRule`): `conditions` (все должны совпасть) + `actions`
+(выполняются по порядку) + `stopAfter` (не отдавать ход встроенному скрипту).
+Действие `wait` разрывает цепочку — остаток доигрывает планировщик.
+
+---
+
 ## Утилиты
 
 ```ts

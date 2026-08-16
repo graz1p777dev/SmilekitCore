@@ -114,7 +114,15 @@ export async function reply(ctx: DialogContext<GreenApiConfig>): Promise<Outboun
 
   if (orderIntent) await ctx.deal.advance('order')
 
-  return assemble({ replies, voiceReplies, sendPaymentQr, resultsBlockAllowed, needsFollowupAnchor, firstUse: T.firstUseEffect })
+  return assemble({
+    replies,
+    voiceReplies,
+    sendPaymentQr,
+    resultsBlockAllowed,
+    needsFollowupAnchor,
+    firstUse: T.firstUseEffect,
+    base: await mediaBaseUrl(),
+  })
 }
 
 function matchCustomRule(config: GreenApiConfig, text: string, ctx: DialogContext<GreenApiConfig>): string | null {
@@ -163,6 +171,8 @@ interface AssembleInput {
   resultsBlockAllowed: boolean
   needsFollowupAnchor: boolean
   firstUse: string
+  /** Адрес медиафайлов бота; null — шлём только текст. */
+  base: string | null
 }
 
 /**
@@ -172,7 +182,7 @@ interface AssembleInput {
  * файлов бота — без него шлём тот же текст, а не молчим.
  */
 function assemble(input: AssembleInput): OutboundMessage[] {
-  const base = mediaBaseUrl()
+  const base = input.base
   const out: OutboundMessage[] = []
 
   const asMessage = (text: string, index: number): OutboundMessage => {

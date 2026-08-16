@@ -8,11 +8,8 @@
 // запроса, но не по умолчанию.
 
 import { requestOrThrow } from '../../http'
+import { vars } from '../../variables'
 import type { AiProvider, CompletionRequest } from '../../types'
-
-function key(): string | undefined {
-  return process.env.DEEPSEEK_API_KEY?.trim() || undefined
-}
 
 interface ChatResponse {
   choices?: { message?: { content?: string } }[]
@@ -22,16 +19,21 @@ export const deepseek: AiProvider = {
   id: 'deepseek',
   kind: 'ai',
   title: 'DeepSeek',
+  env: {
+    DEEPSEEK_API_KEY: { description: 'ключ API DeepSeek', required: true },
+    DEEPSEEK_MODEL: { description: 'модель, по умолчанию deepseek-chat' },
+    DEEPSEEK_BASE_URL: { description: 'адрес API, по умолчанию https://api.deepseek.com' },
+  },
 
-  isConfigured: () => Boolean(key()),
+  isConfigured: () => Boolean(vars.snapshot('DEEPSEEK_API_KEY')),
 
   async complete(req: CompletionRequest) {
-    const base = (process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com').replace(/\/$/, '')
+    const base = ((await vars.get('DEEPSEEK_BASE_URL')) || 'https://api.deepseek.com').replace(/\/$/, '')
     const data = await requestOrThrow<ChatResponse>(`${base}/chat/completions`, {
-      headers: { authorization: `Bearer ${key()}` },
+      headers: { authorization: `Bearer ${await vars.requireValue('DEEPSEEK_API_KEY')}` },
       timeoutMs: 60_000,
       body: {
-        model: process.env.DEEPSEEK_MODEL || 'deepseek-chat',
+        model: (await vars.get('DEEPSEEK_MODEL')) || 'deepseek-chat',
         messages: [
           ...(req.system ? [{ role: 'system', content: req.system }] : []),
           ...(req.history ?? []),
