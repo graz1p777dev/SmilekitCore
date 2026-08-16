@@ -50,8 +50,8 @@ export function AmoBotToggle() {
       className="flex h-9 items-center gap-1.5 rounded-xl px-3 text-[13px] font-semibold transition-colors disabled:opacity-60"
       style={
         enabled
-          ? { background: '#dcfce7', color: '#15803d', border: '1px solid #86efac' }
-          : { background: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5' }
+          ? { background: 'var(--ok-soft)', color: 'var(--ok)', border: '1px solid #86efac' }
+          : { background: '#fee2e2', color: 'var(--bad)', border: '1px solid #fca5a5' }
       }
       title="Мгновенно глушит ответы бота в WhatsApp-чатах amoCRM. История и этапы сделок продолжают вестись."
     >

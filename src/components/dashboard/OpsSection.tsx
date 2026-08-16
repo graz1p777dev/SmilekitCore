@@ -168,7 +168,7 @@ function BlockHeader({
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-2xl bg-white p-5" style={{ border: '1px solid var(--line)' }}>
+    <div className="rounded-2xl bg-card p-5" style={{ border: '1px solid var(--line)' }}>
       <p className="mb-3.5 text-sm font-semibold" style={{ color: 'var(--ink)' }}>{title}</p>
       {children}
     </div>
@@ -200,7 +200,7 @@ function Tile({
     return (
       <Link
         href={href}
-        className="card-hover block rounded-2xl bg-white px-4 py-3.5"
+        className="card-hover block rounded-2xl bg-card px-4 py-3.5"
         style={{ border: '1px solid var(--line)' }}
       >
         {body}
@@ -208,7 +208,7 @@ function Tile({
     )
   }
   return (
-    <div className="rounded-2xl bg-white px-4 py-3.5" style={{ border: '1px solid var(--line)' }}>
+    <div className="rounded-2xl bg-card px-4 py-3.5" style={{ border: '1px solid var(--line)' }}>
       {body}
     </div>
   )
@@ -246,7 +246,7 @@ function PlanBar({
           className="h-full rounded-full"
           style={{
             width: `${pct}%`,
-            background: done ? '#04815a' : 'linear-gradient(90deg, #5115a4, #8a68ad)',
+            background: done ? '#04815a' : 'linear-gradient(90deg, var(--brand), var(--accent-to))',
           }}
         />
       </div>

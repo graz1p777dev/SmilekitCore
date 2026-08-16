@@ -15,14 +15,21 @@ export default function PageHeader({ title, subtitle, action }: PageHeaderProps)
   return (
     <div
       className="flex items-center justify-between gap-4 px-4 py-4 md:px-8 md:py-5"
-      style={{ background: '#ffffff', borderBottom: '1px solid #ece5e5' }}
+      style={{
+        // Полупрозрачное стекло: сквозь шапку просвечивает аврора фона,
+        // страница выглядит одним слоем, а не стопкой белых плашек.
+        background: 'color-mix(in srgb, var(--surface) 72%, transparent)',
+        backdropFilter: 'blur(14px)',
+        WebkitBackdropFilter: 'blur(14px)',
+        borderBottom: '1px solid var(--line)',
+      }}
     >
       <div className="span-rule min-w-0">
-        <h1 className="truncate" style={{ fontSize: 20, fontWeight: 600, color: '#1b1517' }}>
+        <h1 className="truncate" style={{ fontSize: 20, fontWeight: 600, color: 'var(--ink)' }}>
           {title}
         </h1>
         {subtitle && (
-          <p className="truncate" style={{ fontSize: 13, color: '#7d7174', marginTop: 2 }}>
+          <p className="truncate" style={{ fontSize: 13, color: 'var(--ink-3)', marginTop: 2 }}>
             {subtitle}
           </p>
         )}

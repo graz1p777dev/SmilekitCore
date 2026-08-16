@@ -211,14 +211,14 @@ export default function DealsBoard({ initialStages, initialDeals, employees, me,
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Клиент, телефон, название…"
-              className="h-9 w-56 rounded-xl border border-gray-200 bg-white/80 pl-8 pr-3 text-[13px] outline-none transition-colors focus:border-gray-300"
+              className="h-9 w-56 rounded-xl border border-gray-200 bg-card/80 pl-8 pr-3 text-[13px] outline-none transition-colors focus:border-gray-300"
             />
           </div>
 
           <button
             onClick={() => sync(false)}
             disabled={syncing}
-            className="flex h-9 items-center gap-1.5 rounded-xl border border-gray-200 bg-white/80 px-3 text-[13px] font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:opacity-60"
+            className="flex h-9 items-center gap-1.5 rounded-xl border border-gray-200 bg-card/80 px-3 text-[13px] font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:opacity-60"
             title="Забрать новые диалоги с витрины"
           >
             <RefreshCw size={15} className={cn(syncing && 'animate-spin')} />
@@ -256,7 +256,7 @@ export default function DealsBoard({ initialStages, initialDeals, employees, me,
               className={cn(
                 'flex w-[290px] shrink-0 flex-col rounded-2xl border transition-colors',
                 isTarget && dragId
-                  ? 'border-[#cdb8e8] bg-[#f1ebfa]/60'
+                  ? 'border-[#cdb8e8] bg-[var(--brand-soft)]/60'
                   : 'border-gray-100 bg-gray-50/60'
               )}
             >
@@ -280,7 +280,7 @@ export default function DealsBoard({ initialStages, initialDeals, employees, me,
                   </div>
                   <button
                     onClick={() => openNew(stage.id)}
-                    className="rounded-lg p-1 text-gray-400 transition-colors hover:bg-white hover:text-gray-600"
+                    className="rounded-lg p-1 text-gray-400 transition-colors hover:bg-card hover:text-gray-600"
                     title="Добавить в этап"
                   >
                     <Plus size={15} />
@@ -306,7 +306,7 @@ export default function DealsBoard({ initialStages, initialDeals, employees, me,
                   />
                 ))}
 
-                {dragId && isTarget && <div className="h-[3px] rounded-full bg-[#5115a4]" />}
+                {dragId && isTarget && <div className="h-[3px] rounded-full bg-[var(--brand)]" />}
 
                 {list.length === 0 && !dragId && (
                   <button

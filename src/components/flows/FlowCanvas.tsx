@@ -10,7 +10,7 @@
 // Канва — это отображение, а не источник истины: выполняется то, что лежит
 // в conditions/actions, а координаты узлов влияют лишь на внешний вид.
 
-import { useCallback, useMemo, useState, useTransition } from 'react'
+import { useCallback, useMemo, useState, useTransition, type CSSProperties } from 'react'
 import {
   Background,
   Controls,
@@ -130,10 +130,20 @@ type NodeData = {
   icon?: typeof MessageSquare
 }
 
-const TONE_STYLES: Record<NodeData['tone'], string> = {
-  trigger: 'border-violet-300 bg-violet-50',
-  condition: 'border-amber-300 bg-amber-50',
-  action: 'border-gray-200 bg-white',
+const TONE_STYLES: Record<NodeData['tone'], CSSProperties> = {
+  trigger: {
+    background: 'linear-gradient(135deg, rgba(124,58,237,0.28), rgba(91,33,182,0.18))',
+    borderColor: 'rgba(167,139,250,0.55)',
+    boxShadow: '0 8px 28px -10px rgba(124,58,237,0.55)',
+  },
+  condition: {
+    background: 'rgba(251,191,36,0.10)',
+    borderColor: 'rgba(251,191,36,0.38)',
+  },
+  action: {
+    background: 'color-mix(in srgb, var(--surface) 88%, transparent)',
+    borderColor: 'var(--line)',
+  },
 }
 
 function FlowNode({ data, selected }: NodeProps) {
@@ -141,17 +151,18 @@ function FlowNode({ data, selected }: NodeProps) {
   const Icon = item.icon ?? GitBranch
   return (
     <div
-      className={`w-56 rounded-2xl border-2 px-3 py-2.5 shadow-sm transition ${TONE_STYLES[item.tone]} ${
-        selected ? 'ring-2 ring-violet-400' : ''
-      } ${item.disabled ? 'opacity-50' : ''}`}
+      className={`w-56 rounded-2xl border px-3 py-2.5 backdrop-blur-md transition ${
+        selected ? 'ring-2 ring-[var(--brand)]' : ''
+      } ${item.disabled ? 'opacity-45' : ''}`}
+      style={TONE_STYLES[item.tone]}
     >
-      <Handle type="target" position={Position.Top} className="!bg-gray-400" />
+      <Handle type="target" position={Position.Top} className="!bg-[var(--ink-4)]" />
       <div className="flex items-center gap-2">
-        <Icon size={14} className="shrink-0 text-gray-600" />
-        <p className="truncate text-xs font-bold text-gray-900">{item.label}</p>
+        <Icon size={14} className="shrink-0" style={{ color: 'var(--brand-ink)' }} />
+        <p className="truncate text-xs font-bold" style={{ color: 'var(--ink)' }}>{item.label}</p>
       </div>
-      <p className="mt-1 line-clamp-2 text-[11px] leading-snug text-gray-500">{item.sub}</p>
-      <Handle type="source" position={Position.Bottom} className="!bg-gray-400" />
+      <p className="mt-1 line-clamp-2 text-[11px] leading-snug" style={{ color: 'var(--ink-3)' }}>{item.sub}</p>
+      <Handle type="source" position={Position.Bottom} className="!bg-[var(--ink-4)]" />
     </div>
   )
 }
@@ -311,7 +322,7 @@ export default function FlowCanvas({ initial }: { initial: FlowRule[] }) {
   const selectedActionIndex = selected?.startsWith('action:') ? Number(selected.split(':')[2]) : null
 
   return (
-    <div className="flex h-full min-h-0 flex-col" style={{ background: 'var(--surface-2)' }}>
+    <div className="flex h-full min-h-0 flex-col" style={{ background: 'transparent' }}>
       <PageHeader
         title="Сценарии"
         subtitle="Если клиент написал — ответить, подождать, сделать. Собирается мышкой, применяется сразу"
@@ -328,7 +339,7 @@ export default function FlowCanvas({ initial }: { initial: FlowRule[] }) {
       />
 
       <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
-        <div className="h-[420px] min-w-0 flex-1 lg:h-auto">
+        <div className="h-[420px] min-w-0 flex-1 lg:h-auto" style={{ background: 'color-mix(in srgb, var(--paper) 55%, transparent)' }}>
           <ReactFlow
             nodes={nodes}
             edges={edges}
@@ -343,12 +354,19 @@ export default function FlowCanvas({ initial }: { initial: FlowRule[] }) {
             fitView
             proOptions={{ hideAttribution: true }}
           >
-            <Background gap={16} color="#e5e0e0" />
+            <Background gap={18} color="rgba(167,139,250,0.14)" />
             <Controls showInteractive={false} />
           </ReactFlow>
         </div>
 
-        <aside className="w-full shrink-0 overflow-y-auto border-l border-gray-200 bg-white p-5 lg:w-[420px]">
+        <aside
+          className="w-full shrink-0 overflow-y-auto p-5 lg:w-[420px]"
+          style={{
+            borderLeft: '1px solid var(--line)',
+            background: 'color-mix(in srgb, var(--surface) 82%, transparent)',
+            backdropFilter: 'blur(16px)',
+          }}
+        >
           {!selectedRule && (
             <div className="space-y-4">
               <div>
@@ -365,7 +383,7 @@ export default function FlowCanvas({ initial }: { initial: FlowRule[] }) {
                 </p>
               </div>
 
-              <div className="rounded-2xl bg-gray-50 p-4">
+              <div className="rounded-2xl p-4" style={{ background: 'var(--surface-2)' }}>
                 <Label className="text-xs">Примерить текст клиента</Label>
                 <Input
                   value={probe}
@@ -410,7 +428,7 @@ export default function FlowCanvas({ initial }: { initial: FlowRule[] }) {
 // ─── Редакторы ───────────────────────────────────────────────────────────
 
 const selectClass =
-  'mt-1 w-full rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs outline-none focus:border-gray-400'
+  'mt-1 w-full rounded-lg border border-[var(--line)] bg-[var(--surface-2)] px-2 py-1.5 text-xs text-[var(--ink)] outline-none focus:border-[var(--brand)]'
 
 function RuleEditor({
   rule,
@@ -459,7 +477,7 @@ function RuleEditor({
         </p>
         <div className="mt-2 space-y-3">
           {rule.conditions.map((condition, index) => (
-            <div key={index} className="rounded-2xl bg-gray-50 p-3">
+            <div key={index} className="rounded-2xl p-3" style={{ background: 'var(--surface-2)' }}>
               <div className="grid grid-cols-2 gap-2">
                 <select
                   value={condition.field}
@@ -690,7 +708,7 @@ function ActionEditor({
         </div>
       )}
 
-      <div className="flex flex-wrap gap-2 border-t border-gray-100 pt-4">
+      <div className="flex flex-wrap gap-2 border-t border-[var(--line)] pt-4">
         <Button variant="outline" size="sm" onClick={() => move(-1)} disabled={index === 0}>
           Выше
         </Button>

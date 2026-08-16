@@ -83,7 +83,7 @@ export default function WhatsappLabPage() {
         </p>
       </div>
 
-      <div className="overflow-hidden rounded-2xl bg-white" style={{ border: '1px solid var(--line)' }}>
+      <div className="overflow-hidden rounded-2xl bg-card" style={{ border: '1px solid var(--line)' }}>
         <div className="flex items-center justify-between gap-2.5 px-5 py-4" style={{ borderBottom: '1px solid var(--line)' }}>
           <div className="flex items-center gap-2.5">
             <div className="flex h-8 w-8 items-center justify-center rounded-xl" style={{ backgroundColor: 'var(--brand-ink)' }}>

@@ -81,7 +81,10 @@ export default async function RootLayout({
   }
 
   return (
-    <html lang="ru" className={`h-full ${fontVars}`} data-accent={accent}>
+    // Тёмная космическая тема — фирменный вид системы (стиль Xnova).
+    // Класс на html, а не в состоянии клиента: ни одной вспышки светлого
+    // фона при загрузке.
+    <html lang="ru" className={`h-full dark ${fontVars}`} data-accent={accent}>
       <body className={`${manrope.className} min-h-full bg-background`}>
         <AuthProvider
           initialEmployee={initialEmployee}
@@ -94,9 +97,9 @@ export default async function RootLayout({
           position="bottom-right"
           toastOptions={{
             style: {
-              background: '#ffffff',
-              border: '1px solid #ece5e5',
-              color: '#1b1517',
+              background: 'var(--surface)',
+              border: '1px solid var(--line)',
+              color: 'var(--ink)',
               borderRadius: '12px',
               boxShadow: '0 12px 32px -14px rgba(28,20,22,0.24)',
             },

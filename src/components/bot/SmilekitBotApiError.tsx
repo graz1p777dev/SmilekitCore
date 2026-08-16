@@ -5,7 +5,7 @@ export function SmilekitBotApiError({ error }: { error: string }) {
   return (
     <div className="p-4 md:p-8">
       <div
-        className="flex max-w-xl items-start gap-3 rounded-2xl bg-white p-5"
+        className="flex max-w-xl items-start gap-3 rounded-2xl bg-card p-5"
         style={{ border: '1px solid var(--line)' }}
       >
         <AlertTriangle size={18} className="mt-0.5 flex-shrink-0" style={{ color: 'var(--brand-ink)' }} />

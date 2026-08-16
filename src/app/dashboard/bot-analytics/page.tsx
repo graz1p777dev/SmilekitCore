@@ -108,8 +108,8 @@ function computeAnalytics(messages: MessageRow[], orders: OrderRow[]): Analytics
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-2xl bg-white p-5">
-      <h2 className="font-semibold text-sm mb-4" style={{ color: '#1b1517' }}>{title}</h2>
+    <div className="rounded-2xl bg-card p-5">
+      <h2 className="font-semibold text-sm mb-4" style={{ color: 'var(--ink)' }}>{title}</h2>
       {children}
     </div>
   )
@@ -152,33 +152,33 @@ export default function BotAnalyticsPage() {
   )
   const maxTopic = useMemo(() => Math.max(...(data?.topics.map((t) => t.count) ?? [1]), 1), [data])
 
-  if (loading) return <p className="p-8 text-sm" style={{ color: '#6b6063' }}>Загрузка аналитики...</p>
-  if (error) return <p className="p-8 text-sm" style={{ color: '#b91c1c' }}>Ошибка: {error}</p>
-  if (!data) return <p className="p-8 text-sm" style={{ color: '#6b6063' }}>Нет данных</p>
+  if (loading) return <p className="p-8 text-sm" style={{ color: 'var(--ink-2)' }}>Загрузка аналитики...</p>
+  if (error) return <p className="p-8 text-sm" style={{ color: 'var(--bad)' }}>Ошибка: {error}</p>
+  if (!data) return <p className="p-8 text-sm" style={{ color: 'var(--ink-2)' }}>Нет данных</p>
 
   const takeoverRate = data.conversations ? Math.round((data.takeoverChats / data.conversations) * 100) : 0
   const conversionRate = data.conversations ? Math.round((data.ordersCount / data.conversations) * 100) : 0
 
   const statCards = [
-    { label: `Диалогов за ${LOOKBACK_DAYS} дн.`, value: data.conversations, color: '#5115a4' },
-    { label: 'Сообщений клиентов', value: data.totalClient, color: '#5115a4' },
-    { label: 'Ответов бота', value: data.totalBot, color: '#047857' },
-    { label: 'Ответов менеджера', value: data.totalOperator, color: '#b45309' },
-    { label: 'Перехвачено менеджером', value: `${data.takeoverChats} (${takeoverRate}%)`, color: '#b91c1c' },
-    { label: 'Заказов', value: data.ordersCount, color: '#5115a4' },
-    { label: 'Конверсия в заказ', value: `${conversionRate}%`, color: '#047857' },
-    { label: 'Сумма заказов', value: `${data.ordersSum.toLocaleString('ru-RU')} сом`, color: '#5115a4' },
+    { label: `Диалогов за ${LOOKBACK_DAYS} дн.`, value: data.conversations, color: 'var(--brand)' },
+    { label: 'Сообщений клиентов', value: data.totalClient, color: 'var(--brand)' },
+    { label: 'Ответов бота', value: data.totalBot, color: 'var(--ok)' },
+    { label: 'Ответов менеджера', value: data.totalOperator, color: 'var(--warn)' },
+    { label: 'Перехвачено менеджером', value: `${data.takeoverChats} (${takeoverRate}%)`, color: 'var(--bad)' },
+    { label: 'Заказов', value: data.ordersCount, color: 'var(--brand)' },
+    { label: 'Конверсия в заказ', value: `${conversionRate}%`, color: 'var(--ok)' },
+    { label: 'Сумма заказов', value: `${data.ordersSum.toLocaleString('ru-RU')} сом`, color: 'var(--brand)' },
   ]
 
   return (
     <div className="p-4 md:p-8 flex flex-col gap-5">
       <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))' }}>
         {statCards.map((s) => (
-          <div key={s.label} className="rounded-2xl bg-white px-4 py-3.5">
+          <div key={s.label} className="rounded-2xl bg-card px-4 py-3.5">
             <div className="text-xl font-bold" style={{ color: s.color }}>
               {typeof s.value === 'number' ? s.value.toLocaleString('ru-RU') : s.value}
             </div>
-            <div className="text-xs mt-0.5" style={{ color: '#6b6063' }}>{s.label}</div>
+            <div className="text-xs mt-0.5" style={{ color: 'var(--ink-2)' }}>{s.label}</div>
           </div>
         ))}
       </div>
@@ -188,15 +188,15 @@ export default function BotAnalyticsPage() {
           {data.daily.map((d) => (
             <div key={d.date} className="flex-1 flex flex-col items-center justify-end h-full gap-0.5" title={`${d.date}: клиент ${d.client}, бот ${d.bot}`}>
               <div className="w-full flex flex-col justify-end gap-0.5" style={{ height: '100%' }}>
-                <div className="w-full rounded-t" style={{ height: `${Math.max((d.bot / maxDaily) * 100, d.bot ? 2 : 0)}%`, backgroundColor: '#047857' }} />
-                <div className="w-full rounded-t" style={{ height: `${Math.max((d.client / maxDaily) * 100, d.client ? 2 : 0)}%`, backgroundColor: '#5115a4' }} />
+                <div className="w-full rounded-t" style={{ height: `${Math.max((d.bot / maxDaily) * 100, d.bot ? 2 : 0)}%`, backgroundColor: 'var(--ok)' }} />
+                <div className="w-full rounded-t" style={{ height: `${Math.max((d.client / maxDaily) * 100, d.client ? 2 : 0)}%`, backgroundColor: 'var(--brand)' }} />
               </div>
             </div>
           ))}
         </div>
-        <div className="flex gap-4 mt-3 text-xs" style={{ color: '#6b6063' }}>
-          <span><span className="inline-block w-2.5 h-2.5 rounded-sm mr-1" style={{ backgroundColor: '#5115a4' }} />клиент</span>
-          <span><span className="inline-block w-2.5 h-2.5 rounded-sm mr-1" style={{ backgroundColor: '#047857' }} />бот</span>
+        <div className="flex gap-4 mt-3 text-xs" style={{ color: 'var(--ink-2)' }}>
+          <span><span className="inline-block w-2.5 h-2.5 rounded-sm mr-1" style={{ backgroundColor: 'var(--brand)' }} />клиент</span>
+          <span><span className="inline-block w-2.5 h-2.5 rounded-sm mr-1" style={{ backgroundColor: 'var(--ok)' }} />бот</span>
         </div>
       </Card>
 
@@ -207,25 +207,25 @@ export default function BotAnalyticsPage() {
               <div key={h.hour} className="flex-1 flex flex-col items-center justify-end h-full" title={`${h.hour}:00 — ${h.count} сообщ.`}>
                 <div className="w-full rounded-t" style={{
                   height: `${Math.max((h.count / maxHour) * 100, 2)}%`,
-                  backgroundColor: '#5115a4', opacity: h.count > 0 ? 1 : 0.15,
+                  backgroundColor: 'var(--brand)', opacity: h.count > 0 ? 1 : 0.15,
                 }} />
-                {h.hour % 6 === 0 && <span className="text-[9px] mt-1" style={{ color: '#7d7174' }}>{h.hour}</span>}
+                {h.hour % 6 === 0 && <span className="text-[9px] mt-1" style={{ color: 'var(--ink-3)' }}>{h.hour}</span>}
               </div>
             ))}
           </div>
         </Card>
 
         <Card title="О чём спрашивают клиенты">
-          {data.topics.every((t) => t.count === 0) && <p className="text-sm" style={{ color: '#6b6063' }}>Нет данных</p>}
+          {data.topics.every((t) => t.count === 0) && <p className="text-sm" style={{ color: 'var(--ink-2)' }}>Нет данных</p>}
           <div className="flex flex-col gap-2.5">
             {data.topics.filter((t) => t.count > 0).map((t) => (
               <div key={t.label}>
                 <div className="flex justify-between text-xs mb-1">
-                  <span style={{ color: '#1b1517' }}>{t.label}</span>
-                  <span style={{ color: '#6b6063' }}>{t.count}</span>
+                  <span style={{ color: 'var(--ink)' }}>{t.label}</span>
+                  <span style={{ color: 'var(--ink-2)' }}>{t.count}</span>
                 </div>
-                <div className="h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: '#fdfbfb' }}>
-                  <div className="h-full rounded-full" style={{ width: `${(t.count / maxTopic) * 100}%`, backgroundColor: '#5115a4' }} />
+                <div className="h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--surface-2)' }}>
+                  <div className="h-full rounded-full" style={{ width: `${(t.count / maxTopic) * 100}%`, backgroundColor: 'var(--brand)' }} />
                 </div>
               </div>
             ))}

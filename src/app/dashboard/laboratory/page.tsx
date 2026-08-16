@@ -65,7 +65,7 @@ export default function LaboratoryPage() {
         </p>
       </div>
 
-      <div className="overflow-hidden rounded-2xl bg-white" style={{ border: '1px solid var(--line)' }}>
+      <div className="overflow-hidden rounded-2xl bg-card" style={{ border: '1px solid var(--line)' }}>
         <div className="flex items-center justify-between gap-2.5 px-5 py-4" style={{ borderBottom: '1px solid var(--line)' }}>
           <div className="flex items-center gap-2.5">
             <div className="flex h-8 w-8 items-center justify-center rounded-xl" style={{ backgroundColor: 'var(--brand-ink)' }}>
@@ -111,8 +111,8 @@ export default function LaboratoryPage() {
                 className="whitespace-pre-wrap break-words rounded-2xl px-3.5 py-2 text-sm"
                 style={
                   message.role === 'user'
-                    ? { background: '#ffffff', border: '1px solid var(--line)', color: 'var(--ink)', borderBottomLeftRadius: 4 }
-                    : { background: 'var(--brand-ink)', color: '#ffffff', borderBottomRightRadius: 4 }
+                    ? { background: 'var(--surface)', border: '1px solid var(--line)', color: 'var(--ink)', borderBottomLeftRadius: 4 }
+                    : { background: 'var(--brand-ink)', color: 'var(--on-brand)', borderBottomRightRadius: 4 }
                 }
               >
                 {message.content}
@@ -122,7 +122,7 @@ export default function LaboratoryPage() {
           {loading && (
             <div
               className="self-start rounded-2xl px-3.5 py-2 text-sm"
-              style={{ background: '#ffffff', border: '1px solid var(--line)', color: 'var(--ink-3)', borderBottomLeftRadius: 4 }}
+              style={{ background: 'var(--surface)', border: '1px solid var(--line)', color: 'var(--ink-3)', borderBottomLeftRadius: 4 }}
             >
               печатает…
             </div>

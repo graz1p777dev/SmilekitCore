@@ -92,15 +92,17 @@ export default function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
           mobileOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full',
         )}
         style={{
-          background: 'linear-gradient(180deg, #5115a4 0%, #360e7f 100%)',
-          borderRight: '1px solid rgba(255,255,255,0.14)',
-          boxShadow: '8px 0 28px -18px rgba(81, 21, 164,0.45)',
+          background: 'linear-gradient(180deg, rgba(30,21,54,0.92) 0%, rgba(14,10,26,0.95) 100%)',
+          backdropFilter: 'blur(18px)',
+          WebkitBackdropFilter: 'blur(18px)',
+          borderRight: '1px solid var(--line)',
+          boxShadow: '8px 0 40px -18px rgba(124, 58, 237, 0.35)',
         }}
       >
       {/* Логотип */}
       <div
         className="flex items-center gap-3 px-4 py-4 flex-shrink-0"
-        style={{ borderBottom: '1px solid rgba(255,255,255,0.18)' }}
+        style={{ borderBottom: '1px solid var(--line)' }}
       >
         <div
           className="brand-mark flex-shrink-0"
@@ -116,7 +118,7 @@ export default function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
           <p className="brand-wordmark text-white truncate whitespace-nowrap" style={{ fontSize: 14 }}>
             smilekit
           </p>
-          <p style={{ fontSize: 11, color: '#ffffff' }} className="truncate whitespace-nowrap">
+          <p style={{ fontSize: 11, color: 'var(--ink-3)' }} className="truncate whitespace-nowrap">
             CRM система
           </p>
         </div>
@@ -134,9 +136,9 @@ export default function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
               right: 0,
               top: indicator.top,
               height: indicator.height,
-              background: '#ffffff',
-              borderRadius: 8,
-              boxShadow: '0 4px 14px -4px rgba(40,26,28,0.34), inset 0 0 0 1px rgba(255,255,255,0.9)',
+              background: 'linear-gradient(135deg, var(--accent-from), var(--accent-deep))',
+              borderRadius: 10,
+              boxShadow: '0 6px 22px -6px var(--accent-shadow), inset 0 0 0 1px rgba(255,255,255,0.14)',
               opacity: indicator.visible ? 1 : 0,
               transition: animate
                 ? 'top 260ms cubic-bezier(0.22,1,0.36,1), height 260ms cubic-bezier(0.22,1,0.36,1), opacity 150ms ease'
@@ -159,7 +161,7 @@ export default function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
                     'transition-opacity duration-200',
                     expanded ? 'opacity-100' : 'opacity-0',
                   )}
-                  style={{ fontSize: 10, color: '#ffffff' }}
+                  style={{ fontSize: 10, color: 'var(--ink-4)' }}
                 >
                   {group.label}
                 </p>
@@ -186,15 +188,15 @@ export default function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
                           className={cn(
                             'relative flex items-center gap-2.5 px-2.5 py-2 rounded-md transition-colors duration-150 outline-none',
                             active
-                              ? 'text-[#5115a4] font-medium'
-                              : 'text-white hover:bg-white/[0.14] hover:text-white focus-visible:bg-white/[0.14] focus-visible:text-white'
+                              ? 'text-white font-medium'
+                              : 'text-[var(--ink-2)] hover:bg-white/[0.06] hover:text-white focus-visible:bg-white/[0.06] focus-visible:text-white'
                           )}
                           style={{ zIndex: 1 }}
                         >
                           <span
                             className="relative flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-lg"
                             style={{
-                              background: active ? 'rgba(81, 21, 164,0.10)' : 'rgba(255,255,255,0.16)',
+                              background: active ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.06)',
                               boxShadow: 'none',
                             }}
                             aria-hidden
@@ -208,7 +210,7 @@ export default function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
                                 width: 18,
                                 height: 18,
                                 borderRadius: 999,
-                                backgroundColor: active ? 'rgba(81, 21, 164,0.08)' : 'rgba(255,255,255,0.10)',
+                                backgroundColor: 'transparent',
                               }}
                             />
                             <Icon
@@ -216,7 +218,7 @@ export default function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
                                 position: 'relative',
                                 width: 14,
                                 height: 14,
-                                color: active ? '#5115a4' : '#ffffff',
+                                color: active ? '#ffffff' : 'var(--ink-3)',
                                 flexShrink: 0,
                               }}
                             />
@@ -244,7 +246,7 @@ export default function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
       {/* Пользователь */}
       <div
         className="flex-shrink-0 px-3 py-3"
-        style={{ borderTop: '1px solid rgba(255,255,255,0.18)' }}
+        style={{ borderTop: '1px solid var(--line)' }}
       >
         <div className="flex items-center gap-2.5">
           {/* Аватар */}
@@ -268,7 +270,7 @@ export default function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
             <p className="text-white font-medium truncate whitespace-nowrap" style={{ fontSize: 12 }}>
               {user?.name ?? 'Загрузка...'}
             </p>
-            <p style={{ fontSize: 11, color: '#ffffff' }} className="truncate whitespace-nowrap">
+            <p style={{ fontSize: 11, color: 'var(--ink-3)' }} className="truncate whitespace-nowrap">
               {role ? ROLE_LABELS[role] : ''}
             </p>
           </div>
@@ -280,13 +282,13 @@ export default function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
               'flex-shrink-0 transition-all duration-200',
               expanded ? 'opacity-100' : 'opacity-0 pointer-events-none',
             )}
-            style={{ color: 'rgba(255,255,255,0.9)' }}
+            style={{ color: 'var(--ink-2)' }}
             title="Выйти"
             onMouseEnter={(e) => {
               (e.currentTarget as HTMLButtonElement).style.color = '#ffffff'
             }}
             onMouseLeave={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.9)'
+              (e.currentTarget as HTMLButtonElement).style.color = 'var(--ink-2)'
             }}
           >
             <LogOut style={{ width: 15, height: 15 }} />

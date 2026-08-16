@@ -21,8 +21,8 @@ import { NAV_GROUPS } from '@/config/nav'
 import { HELP_CONTENT } from '@/config/help-content'
 import type { UserRole } from '@/types'
 
-const navy = '#1b1517'
-const steel = '#6b6063'
+const navy = 'var(--ink)'
+const steel = 'var(--ink-2)'
 
 export default function HelpPage() {
   const { user } = useAuth()
@@ -41,7 +41,7 @@ export default function HelpPage() {
     <div className="p-4 md:p-8 flex flex-col gap-6 max-w-5xl">
       {/* Шапка */}
       <div className="flex items-start gap-3">
-        <div className="flex items-center justify-center w-11 h-11 rounded-2xl shrink-0" style={{ backgroundColor: '#5115a4' }}>
+        <div className="flex items-center justify-center w-11 h-11 rounded-2xl shrink-0" style={{ backgroundColor: 'var(--brand)' }}>
           <HelpCircle size={22} color="#fff" />
         </div>
         <div>
@@ -52,14 +52,14 @@ export default function HelpPage() {
         </div>
       </div>
 
-      <section className="rounded-2xl bg-white p-5 md:p-6" style={{ border: '1px solid #f0eaea' }}>
+      <section className="rounded-2xl bg-card p-5 md:p-6" style={{ border: '1px solid var(--surface-3)' }}>
         <div className="flex items-start gap-3">
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl" style={{ backgroundColor: '#faf8f7' }}>
-            <Bot size={20} color="#5115a4" />
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl" style={{ backgroundColor: 'var(--surface-2)' }}>
+            <Bot size={20} color="var(--brand)" />
           </div>
           <div>
             <h2 className="font-bold text-lg" style={{ color: navy }}>Как работает AI-бот</h2>
-            <p className="mt-1 text-sm leading-relaxed" style={{ color: '#574d4f' }}>
+            <p className="mt-1 text-sm leading-relaxed" style={{ color: 'var(--ink-2)' }}>
               Бот не отправляет клиенту текст сам по себе: каждый AI-ответ сначала приходит менеджерам на согласование в Telegram.
               Клиент получит сообщение только после нажатия «Принять».
             </p>
@@ -74,8 +74,8 @@ export default function HelpPage() {
             { icon: CheckCircle2, title: '4. Решение менеджера', text: 'Ответ можно принять, изменить, сохранить или отклонить.' },
             { icon: Send, title: '5. Отправка', text: 'После принятия сообщение уходит клиенту в amoCRM и появляется в диалоге.' },
           ].map(({ icon: Icon, title, text }) => (
-            <div key={title} className="rounded-xl p-4" style={{ backgroundColor: '#fdfbfb', border: '1px solid #faf8f7' }}>
-              <Icon size={18} color="#5115a4" />
+            <div key={title} className="rounded-xl p-4" style={{ backgroundColor: 'var(--surface-2)', border: '1px solid var(--surface-2)' }}>
+              <Icon size={18} color="var(--brand)" />
               <p className="mt-2 text-sm font-semibold" style={{ color: navy }}>{title}</p>
               <p className="mt-1 text-xs leading-relaxed" style={{ color: steel }}>{text}</p>
             </div>
@@ -84,7 +84,7 @@ export default function HelpPage() {
       </section>
 
       <section className="grid gap-4 lg:grid-cols-2">
-        <div className="rounded-2xl bg-white p-5" style={{ border: '1px solid #f0eaea' }}>
+        <div className="rounded-2xl bg-card p-5" style={{ border: '1px solid var(--surface-3)' }}>
           <h2 className="font-bold" style={{ color: navy }}>Кнопки в карточке согласования</h2>
           <div className="mt-4 grid gap-3 text-sm">
             {[
@@ -96,20 +96,20 @@ export default function HelpPage() {
               ['🔁 Повторить отправку', 'Появляется только при ошибке отправки. Повторяет именно этот ответ, а не создаёт новый черновик.'],
             ].map(([title, text]) => (
               <div key={title} className="flex gap-3">
-                <span className="min-w-36 font-semibold" style={{ color: '#5115a4' }}>{title}</span>
-                <p style={{ color: '#574d4f' }}>{text}</p>
+                <span className="min-w-36 font-semibold" style={{ color: 'var(--brand)' }}>{title}</span>
+                <p style={{ color: 'var(--ink-2)' }}>{text}</p>
               </div>
             ))}
           </div>
         </div>
 
-        <div className="rounded-2xl bg-white p-5" style={{ border: '1px solid #f0eaea' }}>
+        <div className="rounded-2xl bg-card p-5" style={{ border: '1px solid var(--surface-3)' }}>
           <h2 className="font-bold" style={{ color: navy }}>Где смотреть работу бота в CRM</h2>
           <div className="mt-4 grid gap-4 text-sm">
-            <div className="flex gap-3"><MessageCircle size={18} className="shrink-0" color="#5115a4" /><p style={{ color: '#574d4f' }}><b style={{ color: navy }}>Диалоги</b> — история переписки, сообщения клиента, AI-черновики и уже отправленные ответы.</p></div>
-            <div className="flex gap-3"><ClipboardCheck size={18} className="shrink-0" color="#5115a4" /><p style={{ color: '#574d4f' }}><b style={{ color: navy }}>Аналитика и отчёты бота</b> — количество входящих сообщений, согласований, отправок, отклонений и ежедневная сводка.</p></div>
-            <div className="flex gap-3"><Settings2 size={18} className="shrink-0" color="#5115a4" /><p style={{ color: '#574d4f' }}><b style={{ color: navy }}>Настройки бота</b> — промпт, модель, менеджеры, стоп-слова и чёрный список. Меняйте их только если понимаете эффект.</p></div>
-            <div className="flex gap-3"><FlaskConical size={18} className="shrink-0" color="#5115a4" /><p style={{ color: '#574d4f' }}><b style={{ color: navy }}>Лаборатория</b> — безопасно проверяет ответы на тестовых клиентах. Тестовые сообщения не уходят настоящим людям и не меняют amoCRM.</p></div>
+            <div className="flex gap-3"><MessageCircle size={18} className="shrink-0" color="var(--brand)" /><p style={{ color: 'var(--ink-2)' }}><b style={{ color: navy }}>Диалоги</b> — история переписки, сообщения клиента, AI-черновики и уже отправленные ответы.</p></div>
+            <div className="flex gap-3"><ClipboardCheck size={18} className="shrink-0" color="var(--brand)" /><p style={{ color: 'var(--ink-2)' }}><b style={{ color: navy }}>Аналитика и отчёты бота</b> — количество входящих сообщений, согласований, отправок, отклонений и ежедневная сводка.</p></div>
+            <div className="flex gap-3"><Settings2 size={18} className="shrink-0" color="var(--brand)" /><p style={{ color: 'var(--ink-2)' }}><b style={{ color: navy }}>Настройки бота</b> — промпт, модель, менеджеры, стоп-слова и чёрный список. Меняйте их только если понимаете эффект.</p></div>
+            <div className="flex gap-3"><FlaskConical size={18} className="shrink-0" color="var(--brand)" /><p style={{ color: 'var(--ink-2)' }}><b style={{ color: navy }}>Лаборатория</b> — безопасно проверяет ответы на тестовых клиентах. Тестовые сообщения не уходят настоящим людям и не меняют amoCRM.</p></div>
           </div>
         </div>
       </section>
@@ -119,7 +119,7 @@ export default function HelpPage() {
           <AlertTriangle size={20} className="mt-0.5 shrink-0" color="#b7791f" />
           <div>
             <h2 className="font-bold" style={{ color: navy }}>Если ответ не ушёл клиенту</h2>
-            <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm leading-relaxed" style={{ color: '#574d4f' }}>
+            <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm leading-relaxed" style={{ color: 'var(--ink-2)' }}>
               <li>Смотрите текст на карточке: «Отправлено» означает, что amoCRM подтвердил отправку.</li>
               <li>Если написано «Не отправлено», нажмите «Повторить отправку». Не создавайте второй ответ вручную, пока не проверите карточку.</li>
               <li>Если повтор не помог, откройте «Диалоги» и сообщите владельцу номер AI-ответа из карточки — он сможет посмотреть техническую причину в логах.</li>
@@ -129,23 +129,23 @@ export default function HelpPage() {
         </div>
       </section>
 
-      <section className="rounded-2xl bg-white p-5 md:p-6" style={{ border: '1px solid #f0eaea' }}>
+      <section className="rounded-2xl bg-card p-5 md:p-6" style={{ border: '1px solid var(--surface-3)' }}>
         <div className="flex items-start gap-3">
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl" style={{ backgroundColor: '#fdfbfb' }}>
-            <BarChart3 size={20} color="#5115a4" />
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl" style={{ backgroundColor: 'var(--surface-2)' }}>
+            <BarChart3 size={20} color="var(--brand)" />
           </div>
           <div>
             <h2 className="font-bold text-lg" style={{ color: navy }}>Как читать главный дашборд</h2>
-            <p className="mt-1 text-sm leading-relaxed" style={{ color: '#574d4f' }}>
+            <p className="mt-1 text-sm leading-relaxed" style={{ color: 'var(--ink-2)' }}>
               Главная страница — это не место для ввода данных, а короткая сводка. Она автоматически считает показатели из записей, продаж, финансов и расписания, доступных вашей роли.
             </p>
           </div>
         </div>
 
         <div className="mt-5 grid gap-4 lg:grid-cols-2">
-          <div className="rounded-xl p-4" style={{ backgroundColor: '#fdfbfb', border: '1px solid #faf8f7' }}>
-            <p className="text-xs font-bold uppercase tracking-wider" style={{ color: '#6b6063' }}>Слева · итоги месяца</p>
-            <div className="mt-3 space-y-3 text-sm" style={{ color: '#574d4f' }}>
+          <div className="rounded-xl p-4" style={{ backgroundColor: 'var(--surface-2)', border: '1px solid var(--surface-2)' }}>
+            <p className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--ink-2)' }}>Слева · итоги месяца</p>
+            <div className="mt-3 space-y-3 text-sm" style={{ color: 'var(--ink-2)' }}>
               <p><b style={{ color: navy }}>Первичные встречи (ФВ)</b> — сколько первых встреч проведено за текущий месяц и насколько выполнен план.</p>
               <p><b style={{ color: navy }}>Продажи</b> — количество закрытых продаж за месяц.</p>
               <p><b style={{ color: navy }}>Выручка</b> — сумма продаж, которые внесены в систему.</p>
@@ -155,9 +155,9 @@ export default function HelpPage() {
             </div>
           </div>
 
-          <div className="rounded-xl p-4" style={{ backgroundColor: '#fdfbfb', border: '1px solid #faf8f7' }}>
-            <p className="text-xs font-bold uppercase tracking-wider" style={{ color: '#6b6063' }}>Справа · сегодня</p>
-            <div className="mt-3 space-y-3 text-sm" style={{ color: '#574d4f' }}>
+          <div className="rounded-xl p-4" style={{ backgroundColor: 'var(--surface-2)', border: '1px solid var(--surface-2)' }}>
+            <p className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--ink-2)' }}>Справа · сегодня</p>
+            <div className="mt-3 space-y-3 text-sm" style={{ color: 'var(--ink-2)' }}>
               <p><b style={{ color: navy }}>ФВ сегодня и продажи сегодня</b> — только события текущего дня, не итог месяца.</p>
               <p><b style={{ color: navy }}>Выручка сегодня</b> появляется, когда в сегодняшних продажах есть сумма.</p>
               <p><b style={{ color: navy }}>Записи · лента</b> обновляется автоматически при новой записи: показывает клиента, статус, менеджера, сумму и время.</p>
@@ -168,13 +168,13 @@ export default function HelpPage() {
         </div>
 
         <div className="mt-4 grid gap-3 md:grid-cols-2">
-          <Link href="/dashboard/finance" className="rounded-xl p-4 transition-shadow hover:shadow-md" style={{ border: '1px solid #f0eaea' }}>
-            <BarChart3 size={18} color="#5115a4" />
+          <Link href="/dashboard/finance" className="rounded-xl p-4 transition-shadow hover:shadow-md" style={{ border: '1px solid var(--surface-3)' }}>
+            <BarChart3 size={18} color="var(--brand)" />
             <p className="mt-2 text-sm font-semibold" style={{ color: navy }}>Нужно понять деньги?</p>
             <p className="mt-1 text-xs" style={{ color: steel }}>Откройте «Финансы» для движения денег, счетов и детальных операций.</p>
           </Link>
-          <Link href="/dashboard/employees" className="rounded-xl p-4 transition-shadow hover:shadow-md" style={{ border: '1px solid #f0eaea' }}>
-            <Users size={18} color="#5115a4" />
+          <Link href="/dashboard/employees" className="rounded-xl p-4 transition-shadow hover:shadow-md" style={{ border: '1px solid var(--surface-3)' }}>
+            <Users size={18} color="var(--brand)" />
             <p className="mt-2 text-sm font-semibold" style={{ color: navy }}>Нужно увидеть команду?</p>
             <p className="mt-1 text-xs" style={{ color: steel }}>Откройте «Сотрудники» — там роли, данные и доступы пользователей.</p>
           </Link>
@@ -183,7 +183,7 @@ export default function HelpPage() {
 
       {groups.map((group) => (
         <div key={group.label} className="flex flex-col gap-3">
-          <h2 className="text-xs font-bold uppercase tracking-widest" style={{ color: '#7d7174' }}>
+          <h2 className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--ink-3)' }}>
             {group.label}
           </h2>
           <div className="grid gap-3 md:grid-cols-2">
@@ -192,9 +192,9 @@ export default function HelpPage() {
               const Icon = item.icon
               const external = item.href.startsWith('/inventory')
               const cardInner = (
-                <div className="flex items-start gap-3 rounded-2xl bg-white p-5 h-full transition-shadow hover:shadow-md">
-                  <div className="flex items-center justify-center w-9 h-9 rounded-xl shrink-0" style={{ backgroundColor: '#fdfbfb' }}>
-                    <Icon size={17} color="#5115a4" />
+                <div className="flex items-start gap-3 rounded-2xl bg-card p-5 h-full transition-shadow hover:shadow-md">
+                  <div className="flex items-center justify-center w-9 h-9 rounded-xl shrink-0" style={{ backgroundColor: 'var(--surface-2)' }}>
+                    <Icon size={17} color="var(--brand)" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
@@ -205,7 +205,7 @@ export default function HelpPage() {
                         <ArrowRight size={13} color={steel} />
                       )}
                     </div>
-                    <p className="mt-1 text-sm" style={{ color: '#574d4f' }}>
+                    <p className="mt-1 text-sm" style={{ color: 'var(--ink-2)' }}>
                       {help?.summary ?? 'Раздел системы.'}
                     </p>
                     {help?.details && (
@@ -213,7 +213,7 @@ export default function HelpPage() {
                         {help.details}
                       </p>
                     )}
-                    <span className="mt-2 inline-block text-xs font-medium" style={{ color: '#5115a4' }}>
+                    <span className="mt-2 inline-block text-xs font-medium" style={{ color: 'var(--brand)' }}>
                       Открыть →
                     </span>
                   </div>

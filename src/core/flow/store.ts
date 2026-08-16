@@ -46,14 +46,22 @@ function toRule(row: Row): FlowRule {
 async function loadAll(): Promise<FlowRule[]> {
   if (cache && Date.now() - cache.loadedAt < CACHE_TTL_MS) return cache.rules
 
-  const { data, error } = await createAdminClient()
-    .from(TABLE)
-    .select('id, channel, name, enabled, position, conditions, actions, stop_after, layout')
-    .order('position')
-  if (error) {
-    // Миграция не применена или база недоступна — бот продолжает работать
-    // по встроенному скрипту, без сценариев с канвы.
-    log.warn(`сценарии недоступны: ${error.message}`)
+  // Любая причина недоступности (нет service-ключа в локальной среде,
+  // миграция не применена, база недоступна) деградирует одинаково: бот
+  // работает по встроенному скрипту, без сценариев с канвы.
+  let data: unknown[] | null = null
+  try {
+    const result = await createAdminClient()
+      .from(TABLE)
+      .select('id, channel, name, enabled, position, conditions, actions, stop_after, layout')
+      .order('position')
+    if (result.error) {
+      log.warn(`сценарии недоступны: ${result.error.message}`)
+      return []
+    }
+    data = result.data
+  } catch (error) {
+    log.warn('сценарии недоступны', error)
     return []
   }
 

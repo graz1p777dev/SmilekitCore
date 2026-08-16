@@ -20,10 +20,10 @@ function Card({
   children: React.ReactNode
 }) {
   return (
-    <div className="rounded-2xl bg-white p-5">
+    <div className="rounded-2xl bg-card p-5">
       <div className="flex items-center gap-2.5 mb-4">
         <MetricIconBadge name={title} variant={icon} />
-        <h2 className="font-semibold text-sm" style={{ color: '#1b1517' }}>{title}</h2>
+        <h2 className="font-semibold text-sm" style={{ color: 'var(--ink)' }}>{title}</h2>
       </div>
       {children}
     </div>
@@ -31,7 +31,7 @@ function Card({
 }
 
 const inputCls = 'rounded-xl px-3 py-2 text-sm outline-none'
-const inputStyle = { backgroundColor: '#fdfbfb', color: '#1b1517' } as const
+const inputStyle = { backgroundColor: 'var(--surface-2)', color: 'var(--ink)' } as const
 
 export default function BotReportsPage() {
   const [daily, setDaily] = useState<DayRow[]>([])
@@ -84,7 +84,7 @@ export default function BotReportsPage() {
   if (loading) return (
     <div className="flex flex-col items-center justify-center gap-4 p-8" style={{ minHeight: '60vh' }}>
       <GlowOrb size={72} label="Загрузка отчётов" />
-      <p className="text-sm" style={{ color: '#6b6063' }}>Загрузка отчётов...</p>
+      <p className="text-sm" style={{ color: 'var(--ink-2)' }}>Загрузка отчётов...</p>
     </div>
   )
 
@@ -99,46 +99,46 @@ export default function BotReportsPage() {
     <div className="p-4 md:p-8 flex flex-col gap-5">
       <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))' }}>
         {[
-          { label: 'Новых за год', value: totals.new, color: '#5115a4' },
-          { label: 'Принято', value: totals.approved, color: '#15803d' },
-          { label: 'Отклонено', value: totals.rejected, color: '#5115a4' },
-          { label: 'В чёрном списке', value: blacklist.length, color: '#b45309' },
-          { label: 'Стоп-слов', value: stopWords.length, color: '#5115a4' },
+          { label: 'Новых за год', value: totals.new, color: 'var(--brand)' },
+          { label: 'Принято', value: totals.approved, color: 'var(--ok)' },
+          { label: 'Отклонено', value: totals.rejected, color: 'var(--brand)' },
+          { label: 'В чёрном списке', value: blacklist.length, color: 'var(--warn)' },
+          { label: 'Стоп-слов', value: stopWords.length, color: 'var(--brand)' },
         ].map(s => (
-          <div key={s.label} className="rounded-2xl bg-white px-4 py-3.5">
+          <div key={s.label} className="rounded-2xl bg-card px-4 py-3.5">
             <div className="text-xl font-bold" style={{ color: s.color }}>{s.value}</div>
-            <div className="text-xs mt-0.5" style={{ color: '#6b6063' }}>{s.label}</div>
+            <div className="text-xs mt-0.5" style={{ color: 'var(--ink-2)' }}>{s.label}</div>
           </div>
         ))}
       </div>
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1.5fr)_minmax(260px,0.8fr)]">
         <Card title="История ежедневных сводок" icon="calendar">
-          <p className="mb-3 text-xs" style={{ color: '#6b6063' }}>Все дни с активностью бота за последний год. Нажмите на дату, чтобы открыть её итог.</p>
+          <p className="mb-3 text-xs" style={{ color: 'var(--ink-2)' }}>Все дни с активностью бота за последний год. Нажмите на дату, чтобы открыть её итог.</p>
           <div className="overflow-y-auto" style={{ maxHeight: 360 }}>
             <table className="w-full text-sm" style={{ borderCollapse: 'collapse' }}>
-              <thead><tr className="sticky top-0 bg-white text-xs uppercase" style={{ color: '#6b6063' }}><th className="text-left py-2 pr-3 font-medium">Дата</th><th className="text-right py-2 px-3 font-medium">Новых</th><th className="text-right py-2 px-3 font-medium">Принято</th><th className="text-right py-2 px-3 font-medium">Отклонено</th><th className="text-right py-2 pl-3 font-medium">Сохранено</th></tr></thead>
-              <tbody>{daily.map(row => <tr key={row.day} onClick={() => setSelectedDay(row.day)} className="cursor-pointer transition-colors" style={{ borderTop: '1px solid #fdfbfb', backgroundColor: selectedDay === row.day ? '#faf8f7' : undefined }}><td className="py-2 pr-3 font-medium" style={{ color: '#1b1517' }}>{new Date(`${row.day}T00:00:00`).toLocaleDateString('ru-RU')}</td><td className="py-2 px-3 text-right font-semibold" style={{ color: '#5115a4' }}>{row.new}</td><td className="py-2 px-3 text-right" style={{ color: '#15803d' }}>{row.approved}</td><td className="py-2 px-3 text-right" style={{ color: '#5115a4' }}>{row.rejected}</td><td className="py-2 pl-3 text-right" style={{ color: '#6b6063' }}>{row.saved}</td></tr>)}{daily.length === 0 && <tr><td colSpan={5} className="py-5 text-center" style={{ color: '#6b6063' }}>За этот период нет активности</td></tr>}</tbody>
+              <thead><tr className="sticky top-0 bg-card text-xs uppercase" style={{ color: 'var(--ink-2)' }}><th className="text-left py-2 pr-3 font-medium">Дата</th><th className="text-right py-2 px-3 font-medium">Новых</th><th className="text-right py-2 px-3 font-medium">Принято</th><th className="text-right py-2 px-3 font-medium">Отклонено</th><th className="text-right py-2 pl-3 font-medium">Сохранено</th></tr></thead>
+              <tbody>{daily.map(row => <tr key={row.day} onClick={() => setSelectedDay(row.day)} className="cursor-pointer transition-colors" style={{ borderTop: '1px solid var(--surface-2)', backgroundColor: selectedDay === row.day ? 'var(--surface-2)' : undefined }}><td className="py-2 pr-3 font-medium" style={{ color: 'var(--ink)' }}>{new Date(`${row.day}T00:00:00`).toLocaleDateString('ru-RU')}</td><td className="py-2 px-3 text-right font-semibold" style={{ color: 'var(--brand)' }}>{row.new}</td><td className="py-2 px-3 text-right" style={{ color: 'var(--ok)' }}>{row.approved}</td><td className="py-2 px-3 text-right" style={{ color: 'var(--brand)' }}>{row.rejected}</td><td className="py-2 pl-3 text-right" style={{ color: 'var(--ink-2)' }}>{row.saved}</td></tr>)}{daily.length === 0 && <tr><td colSpan={5} className="py-5 text-center" style={{ color: 'var(--ink-2)' }}>За этот период нет активности</td></tr>}</tbody>
             </table>
           </div>
         </Card>
         <Card title="Сводка за день" icon="calendar">
-          {selectedSummary ? <><p className="mb-4 text-sm font-semibold" style={{ color: '#1b1517' }}>{new Date(`${selectedSummary.day}T00:00:00`).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}</p><div className="grid grid-cols-2 gap-2"><div className="rounded-xl p-3" style={{ backgroundColor: '#fdfbfb' }}><p className="text-xs text-[#5115a4]">Новых</p><b className="text-xl text-[#5115a4]">{selectedSummary.new}</b></div><div className="rounded-xl p-3" style={{ backgroundColor: '#f0fdf4' }}><p className="text-xs text-[#16a34a]">Принято</p><b className="text-xl text-[#15803d]">{selectedSummary.approved}</b></div><div className="rounded-xl p-3" style={{ backgroundColor: '#fef2f2' }}><p className="text-xs text-[#5115a4]">Отклонено</p><b className="text-xl text-[#5115a4]">{selectedSummary.rejected}</b></div><div className="rounded-xl p-3" style={{ backgroundColor: '#fdfbfb' }}><p className="text-xs text-[#6b6063]">Сохранено</p><b className="text-xl text-[#3a3032]">{selectedSummary.saved}</b></div></div></> : <p className="text-sm" style={{ color: '#6b6063' }}>Выберите дату из истории.</p>}
+          {selectedSummary ? <><p className="mb-4 text-sm font-semibold" style={{ color: 'var(--ink)' }}>{new Date(`${selectedSummary.day}T00:00:00`).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}</p><div className="grid grid-cols-2 gap-2"><div className="rounded-xl p-3" style={{ backgroundColor: 'var(--surface-2)' }}><p className="text-xs text-[var(--brand)]">Новых</p><b className="text-xl text-[var(--brand)]">{selectedSummary.new}</b></div><div className="rounded-xl p-3" style={{ backgroundColor: 'var(--ok-soft)' }}><p className="text-xs text-[#16a34a]">Принято</p><b className="text-xl text-[var(--ok)]">{selectedSummary.approved}</b></div><div className="rounded-xl p-3" style={{ backgroundColor: 'var(--bad-soft)' }}><p className="text-xs text-[var(--brand)]">Отклонено</p><b className="text-xl text-[var(--brand)]">{selectedSummary.rejected}</b></div><div className="rounded-xl p-3" style={{ backgroundColor: 'var(--surface-2)' }}><p className="text-xs text-[var(--ink-2)]">Сохранено</p><b className="text-xl text-[#3a3032]">{selectedSummary.saved}</b></div></div></> : <p className="text-sm" style={{ color: 'var(--ink-2)' }}>Выберите дату из истории.</p>}
         </Card>
       </div>
 
       <div className="grid gap-5 md:grid-cols-2">
         <Card title="Воронка по этапам" icon="funnel">
-          {funnel.length === 0 && <p className="text-sm" style={{ color: '#6b6063' }}>Нет данных</p>}
+          {funnel.length === 0 && <p className="text-sm" style={{ color: 'var(--ink-2)' }}>Нет данных</p>}
           <div className="flex flex-col gap-2.5">
             {funnel.map(r => (
               <div key={r.stage}>
                 <div className="flex justify-between text-xs mb-1">
-                  <span style={{ color: '#1b1517' }}>{r.stage}</span>
-                  <span style={{ color: '#6b6063' }}>{r.count} · {r.pct}%</span>
+                  <span style={{ color: 'var(--ink)' }}>{r.stage}</span>
+                  <span style={{ color: 'var(--ink-2)' }}>{r.count} · {r.pct}%</span>
                 </div>
-                <div className="h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: '#fdfbfb' }}>
-                  <div className="h-full rounded-full" style={{ width: `${r.pct}%`, backgroundColor: '#5115a4' }} />
+                <div className="h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--surface-2)' }}>
+                  <div className="h-full rounded-full" style={{ width: `${r.pct}%`, backgroundColor: 'var(--brand)' }} />
                 </div>
               </div>
             ))}
@@ -148,7 +148,7 @@ export default function BotReportsPage() {
         <Card title="Активность менеджеров" icon="people">
           <table className="w-full text-sm" style={{ borderCollapse: 'collapse' }}>
             <thead>
-              <tr className="text-xs uppercase" style={{ color: '#6b6063' }}>
+              <tr className="text-xs uppercase" style={{ color: 'var(--ink-2)' }}>
                 <th className="text-left py-2 pr-2 font-medium">Менеджер</th>
                 <th className="text-right py-2 px-2 font-medium">Принял</th>
                 <th className="text-right py-2 px-2 font-medium">Откл.</th>
@@ -158,15 +158,15 @@ export default function BotReportsPage() {
             </thead>
             <tbody>
               {managers.map(r => (
-                <tr key={r.manager_id} style={{ borderTop: '1px solid #fdfbfb' }}>
-                  <td className="py-2 pr-2 font-medium" style={{ color: '#1b1517' }}>{r.manager_id}</td>
-                  <td className="py-2 px-2 text-right" style={{ color: '#15803d' }}>{r.approved}</td>
-                  <td className="py-2 px-2 text-right" style={{ color: '#5115a4' }}>{r.rejected}</td>
-                  <td className="py-2 px-2 text-right" style={{ color: '#1b1517' }}>{r.edited}</td>
-                  <td className="py-2 pl-2 text-right" style={{ color: '#6b6063' }}>{r.saved}</td>
+                <tr key={r.manager_id} style={{ borderTop: '1px solid var(--surface-2)' }}>
+                  <td className="py-2 pr-2 font-medium" style={{ color: 'var(--ink)' }}>{r.manager_id}</td>
+                  <td className="py-2 px-2 text-right" style={{ color: 'var(--ok)' }}>{r.approved}</td>
+                  <td className="py-2 px-2 text-right" style={{ color: 'var(--brand)' }}>{r.rejected}</td>
+                  <td className="py-2 px-2 text-right" style={{ color: 'var(--ink)' }}>{r.edited}</td>
+                  <td className="py-2 pl-2 text-right" style={{ color: 'var(--ink-2)' }}>{r.saved}</td>
                 </tr>
               ))}
-              {managers.length === 0 && <tr><td colSpan={5} className="py-4 text-center" style={{ color: '#6b6063' }}>Нет данных</td></tr>}
+              {managers.length === 0 && <tr><td colSpan={5} className="py-4 text-center" style={{ color: 'var(--ink-2)' }}>Нет данных</td></tr>}
             </tbody>
           </table>
         </Card>
@@ -176,21 +176,21 @@ export default function BotReportsPage() {
         <div className="flex flex-wrap gap-2 mb-4">
           {stopWords.map(w => (
             <span key={w} className="flex items-center gap-1.5 rounded-full px-3 py-1 text-xs"
-                  style={{ backgroundColor: '#fdfbfb', color: '#1b1517' }}>
+                  style={{ backgroundColor: 'var(--surface-2)', color: 'var(--ink)' }}>
               {w}
-              <button onClick={() => removeStopWord(w)} className="text-sm leading-none" style={{ color: '#5115a4' }}>×</button>
+              <button onClick={() => removeStopWord(w)} className="text-sm leading-none" style={{ color: 'var(--brand)' }}>×</button>
             </span>
           ))}
-          {stopWords.length === 0 && <span className="text-sm" style={{ color: '#6b6063' }}>Нет стоп-слов</span>}
+          {stopWords.length === 0 && <span className="text-sm" style={{ color: 'var(--ink-2)' }}>Нет стоп-слов</span>}
         </div>
         <div className="flex gap-2">
           <input value={newWord} onChange={e => setNewWord(e.target.value)}
                  onKeyDown={e => e.key === 'Enter' && addStopWord()}
                  placeholder="Добавить слово..." className={inputCls} style={{ ...inputStyle, maxWidth: 240, flex: 1 }} />
           <button onClick={addStopWord} className="rounded-xl px-4 py-2 text-sm font-medium text-white"
-                  style={{ backgroundColor: '#5115a4' }}>Добавить</button>
+                  style={{ backgroundColor: 'var(--brand)' }}>Добавить</button>
         </div>
-        <p className="text-xs mt-3" style={{ color: '#6b6063' }}>
+        <p className="text-xs mt-3" style={{ color: 'var(--ink-2)' }}>
           При совпадении слова в сообщении клиента — карточка отправляется с пометкой «стоп-слово» без AI-ответа.
         </p>
       </Card>
@@ -202,14 +202,14 @@ export default function BotReportsPage() {
           <input value={newReason} onChange={e => setNewReason(e.target.value)}
                  placeholder="Причина (необязательно)" className={inputCls} style={{ ...inputStyle, flex: 1, minWidth: 180 }} />
           <button onClick={addBlacklist} className="rounded-xl px-4 py-2 text-sm font-medium text-white"
-                  style={{ backgroundColor: '#5115a4' }}>Добавить</button>
+                  style={{ backgroundColor: 'var(--brand)' }}>Добавить</button>
         </div>
         {blacklist.length === 0 ? (
-          <p className="text-sm" style={{ color: '#6b6063' }}>Чёрный список пуст</p>
+          <p className="text-sm" style={{ color: 'var(--ink-2)' }}>Чёрный список пуст</p>
         ) : (
           <table className="w-full text-sm" style={{ borderCollapse: 'collapse' }}>
             <thead>
-              <tr className="text-xs uppercase" style={{ color: '#6b6063' }}>
+              <tr className="text-xs uppercase" style={{ color: 'var(--ink-2)' }}>
                 <th className="text-left py-2 pr-3 font-medium">Телефон</th>
                 <th className="text-left py-2 px-3 font-medium">Причина</th>
                 <th className="text-left py-2 px-3 font-medium">Добавлен</th>
@@ -218,12 +218,12 @@ export default function BotReportsPage() {
             </thead>
             <tbody>
               {blacklist.map(e => (
-                <tr key={e.id} style={{ borderTop: '1px solid #fdfbfb' }}>
-                  <td className="py-2 pr-3 font-mono text-xs" style={{ color: '#1b1517' }}>{e.phone}</td>
-                  <td className="py-2 px-3" style={{ color: '#6b6063' }}>{e.reason || '—'}</td>
-                  <td className="py-2 px-3 text-xs" style={{ color: '#7d7174' }}>{e.created_at}</td>
+                <tr key={e.id} style={{ borderTop: '1px solid var(--surface-2)' }}>
+                  <td className="py-2 pr-3 font-mono text-xs" style={{ color: 'var(--ink)' }}>{e.phone}</td>
+                  <td className="py-2 px-3" style={{ color: 'var(--ink-2)' }}>{e.reason || '—'}</td>
+                  <td className="py-2 px-3 text-xs" style={{ color: 'var(--ink-3)' }}>{e.created_at}</td>
                   <td className="py-2 pl-3 text-right">
-                    <button onClick={() => removeBlacklist(e.id)} className="text-xs" style={{ color: '#5115a4' }}>Удалить</button>
+                    <button onClick={() => removeBlacklist(e.id)} className="text-xs" style={{ color: 'var(--brand)' }}>Удалить</button>
                   </td>
                 </tr>
               ))}

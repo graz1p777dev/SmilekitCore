@@ -25,9 +25,9 @@ const ROLE_LABELS: Record<string, string> = {
   owner: 'Владелец', rop: 'РОП', mp: 'МП', lmai: 'ЛМАИ', accountant: 'Бухгалтер',
 }
 const STATUS_LABELS: Record<string, { label: string; bg: string; color: string }> = {
-  active:    { label: 'Активный',       bg: '#dcfce7', color: '#166534' },
-  probation: { label: 'Испытательный',  bg: '#fef9c3', color: '#854d0e' },
-  archived:  { label: 'Уволен',         bg: '#fdfbfb', color: '#6b7280' },
+  active:    { label: 'Активный',       bg: 'var(--ok-soft)', color: '#166534' },
+  probation: { label: 'Испытательный',  bg: 'var(--warn-soft)', color: 'var(--warn)' },
+  archived:  { label: 'Уволен',         bg: 'var(--surface-2)', color: 'var(--ink-3)' },
 }
 
 function fmtDate(s: string | null) {
@@ -42,12 +42,12 @@ function fmtMoney(v: number) {
 
 function kpiColor(pct: number) {
   if (pct >= 100) return '#166534'
-  if (pct >= 80)  return '#854d0e'
-  return '#5115a4'
+  if (pct >= 80)  return 'var(--warn)'
+  return 'var(--brand)'
 }
 function kpiBg(pct: number) {
-  if (pct >= 100) return '#dcfce7'
-  if (pct >= 80)  return '#fef9c3'
+  if (pct >= 100) return 'var(--ok-soft)'
+  if (pct >= 80)  return 'var(--warn-soft)'
   return '#fee2e2'
 }
 
@@ -97,19 +97,19 @@ export default async function EmployeeCardPage({ params }: { params: { id: strin
   const deptName = (emp.departments as unknown as { name: string } | null)?.name ?? null
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#fdfbfb' }}>
+    <div className="min-h-screen" style={{ backgroundColor: 'var(--surface-2)' }}>
       {/* Header */}
-      <div className="px-6 py-4 flex items-center gap-4" style={{ backgroundColor: '#ffffff', borderBottom: '1px solid #ece5e5' }}>
+      <div className="px-6 py-4 flex items-center gap-4" style={{ backgroundColor: 'var(--surface)', borderBottom: '1px solid var(--line)' }}>
         <Link
           href="/dashboard/employees"
           className="flex items-center justify-center w-8 h-8 rounded-lg transition-colors"
-          style={{ backgroundColor: '#5115a4' }}
+          style={{ backgroundColor: 'var(--brand)' }}
         >
-          <ArrowLeft size={16} color="#ffffff" />
+          <ArrowLeft size={16} color="var(--surface)" />
         </Link>
         <div>
-          <div className="font-semibold text-base" style={{ color: '#1b1517' }}>{emp.name}</div>
-          <div className="text-xs" style={{ color: '#7d7174' }}>
+          <div className="font-semibold text-base" style={{ color: 'var(--ink)' }}>{emp.name}</div>
+          <div className="text-xs" style={{ color: 'var(--ink-3)' }}>
             {ROLE_LABELS[emp.role] ?? emp.role}
             {deptName && ` · ${deptName}`}
           </div>
@@ -124,14 +124,14 @@ export default async function EmployeeCardPage({ params }: { params: { id: strin
 
       <div className="p-5 grid grid-cols-1 gap-4 lg:grid-cols-3">
         {/* Личные данные */}
-        <div className="rounded-2xl p-5" style={{ backgroundColor: '#ffffff' }}>
+        <div className="rounded-2xl p-5" style={{ backgroundColor: 'var(--surface)' }}>
           <div className="flex items-center gap-2 mb-4">
-            <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-xl font-bold" style={{ backgroundColor: '#faf8f7', color: '#5115a4' }}>
+            <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-xl font-bold" style={{ backgroundColor: 'var(--surface-2)', color: 'var(--brand)' }}>
               {emp.name.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()}
             </div>
             <div>
-              <div className="font-semibold" style={{ color: '#1b1517' }}>{emp.name}</div>
-              <div className="text-xs" style={{ color: '#7d7174' }}>{ROLE_LABELS[emp.role] ?? emp.role}</div>
+              <div className="font-semibold" style={{ color: 'var(--ink)' }}>{emp.name}</div>
+              <div className="text-xs" style={{ color: 'var(--ink-3)' }}>{ROLE_LABELS[emp.role] ?? emp.role}</div>
             </div>
           </div>
 
@@ -145,17 +145,17 @@ export default async function EmployeeCardPage({ params }: { params: { id: strin
           </div>
 
           {emp.notes && (
-            <div className="mt-4 p-3 rounded-xl text-sm" style={{ backgroundColor: '#fdfbfb', color: '#1b1517' }}>
+            <div className="mt-4 p-3 rounded-xl text-sm" style={{ backgroundColor: 'var(--surface-2)', color: 'var(--ink)' }}>
               {emp.notes}
             </div>
           )}
         </div>
 
         {/* KPI текущего периода */}
-        <div className="rounded-2xl p-5" style={{ backgroundColor: '#ffffff' }}>
+        <div className="rounded-2xl p-5" style={{ backgroundColor: 'var(--surface)' }}>
           <div className="flex items-center gap-2 mb-4">
-            <TrendingUp size={16} style={{ color: '#5115a4' }} />
-            <div className="font-semibold text-sm" style={{ color: '#1b1517' }}>
+            <TrendingUp size={16} style={{ color: 'var(--brand)' }} />
+            <div className="font-semibold text-sm" style={{ color: 'var(--ink)' }}>
               KPI — {new Date(year, month - 1).toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })}
             </div>
           </div>
@@ -172,29 +172,29 @@ export default async function EmployeeCardPage({ params }: { params: { id: strin
             <div className="text-2xl font-bold" style={{ color: kpiColor(kpiPct) }}>{kpiPct}%</div>
           </div>
 
-          <div className="mt-2 h-2 rounded-full" style={{ backgroundColor: '#ebebee' }}>
+          <div className="mt-2 h-2 rounded-full" style={{ backgroundColor: 'var(--line)' }}>
             <div className="h-2 rounded-full transition-all" style={{ width: `${Math.min(kpiPct, 100)}%`, backgroundColor: kpiColor(kpiPct) }} />
           </div>
         </div>
 
         {/* Расчёт зарплаты */}
-        <div className="rounded-2xl p-5" style={{ backgroundColor: '#ffffff' }}>
+        <div className="rounded-2xl p-5" style={{ backgroundColor: 'var(--surface)' }}>
           <div className="flex items-center gap-2 mb-4">
-            <Wallet size={16} style={{ color: '#5115a4' }} />
-            <div className="font-semibold text-sm" style={{ color: '#1b1517' }}>Расчёт зарплаты</div>
+            <Wallet size={16} style={{ color: 'var(--brand)' }} />
+            <div className="font-semibold text-sm" style={{ color: 'var(--ink)' }}>Расчёт зарплаты</div>
           </div>
 
           <div className="space-y-3">
             <SalaryRow label="Оклад"              value={fmtMoney(emp.base_salary)} />
             <SalaryRow label="Коэффициент KPI"    value={`× ${emp.kpi_coefficient}`} />
             <SalaryRow label="Выполнение KPI"     value={`${kpiPct}%`} accent={kpiColor(kpiPct)} />
-            <div className="my-3" style={{ height: 1, backgroundColor: '#ebebee' }} />
+            <div className="my-3" style={{ height: 1, backgroundColor: 'var(--line)' }} />
             <SalaryRow label="Бонус"              value={fmtMoney(bonus)} accent={bonus > 0 ? '#166534' : undefined} />
-            <div className="mt-4 p-4" style={{ borderRadius: 18, backgroundColor: '#f1ebfa', border: '1px solid #d9c8ef' }}>
-              <div className="text-xs mb-1" style={{ color: '#6b6063' }}>Итоговая зарплата</div>
-              <div className="text-2xl font-bold" style={{ color: '#5115a4' }}>{fmtMoney(totalSalary)}</div>
+            <div className="mt-4 p-4" style={{ borderRadius: 18, backgroundColor: 'var(--brand-soft)', border: '1px solid #d9c8ef' }}>
+              <div className="text-xs mb-1" style={{ color: 'var(--ink-2)' }}>Итоговая зарплата</div>
+              <div className="text-2xl font-bold" style={{ color: 'var(--brand)' }}>{fmtMoney(totalSalary)}</div>
               {emp.base_salary > 0 && (
-                <div className="text-xs mt-1" style={{ color: '#6b6063' }}>
+                <div className="text-xs mt-1" style={{ color: 'var(--ink-2)' }}>
                   оклад {fmtMoney(emp.base_salary)} + бонус {fmtMoney(bonus)}
                 </div>
               )}
@@ -209,10 +209,10 @@ export default async function EmployeeCardPage({ params }: { params: { id: strin
 function InfoRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
     <div className="flex items-start gap-2">
-      <div className="mt-0.5" style={{ color: '#7d7174' }}>{icon}</div>
+      <div className="mt-0.5" style={{ color: 'var(--ink-3)' }}>{icon}</div>
       <div>
-        <div className="text-xs" style={{ color: '#7d7174' }}>{label}</div>
-        <div className="text-sm" style={{ color: '#1b1517' }}>{value}</div>
+        <div className="text-xs" style={{ color: 'var(--ink-3)' }}>{label}</div>
+        <div className="text-sm" style={{ color: 'var(--ink)' }}>{value}</div>
       </div>
     </div>
   )
@@ -224,14 +224,14 @@ function KpiRow({ label, fact, plan, isMoney }: { label: string; fact: number; p
   return (
     <div>
       <div className="flex items-center justify-between text-xs mb-1">
-        <span style={{ color: '#7d7174' }}>{label}</span>
-        <span style={{ color: '#1b1517' }}>
+        <span style={{ color: 'var(--ink-3)' }}>{label}</span>
+        <span style={{ color: 'var(--ink)' }}>
           <span className="font-medium">{fmt(fact)}</span>
-          {plan > 0 && <span style={{ color: '#7d7174' }}> / {fmt(plan)}</span>}
+          {plan > 0 && <span style={{ color: 'var(--ink-3)' }}> / {fmt(plan)}</span>}
         </span>
       </div>
-      <div className="h-1.5 rounded-full" style={{ backgroundColor: '#ebebee' }}>
-        <div className="h-1.5 rounded-full" style={{ width: `${Math.min(pct, 100)}%`, backgroundColor: '#5115a4' }} />
+      <div className="h-1.5 rounded-full" style={{ backgroundColor: 'var(--line)' }}>
+        <div className="h-1.5 rounded-full" style={{ width: `${Math.min(pct, 100)}%`, backgroundColor: 'var(--brand)' }} />
       </div>
     </div>
   )
@@ -240,8 +240,8 @@ function KpiRow({ label, fact, plan, isMoney }: { label: string; fact: number; p
 function SalaryRow({ label, value, accent }: { label: string; value: string; accent?: string }) {
   return (
     <div className="flex items-center justify-between">
-      <span className="text-sm" style={{ color: '#7d7174' }}>{label}</span>
-      <span className="text-sm font-medium" style={{ color: accent ?? '#1b1517' }}>{value}</span>
+      <span className="text-sm" style={{ color: 'var(--ink-3)' }}>{label}</span>
+      <span className="text-sm font-medium" style={{ color: accent ?? 'var(--ink)' }}>{value}</span>
     </div>
   )
 }

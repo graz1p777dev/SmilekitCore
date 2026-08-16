@@ -272,7 +272,7 @@ export default function DealModal({
 
   return (
     <Modal onClose={onClose} variant="right">
-      <div className="flex h-[100dvh] w-[min(760px,100vw)] flex-col overflow-hidden bg-white shadow-2xl animate-in slide-in-from-right duration-200">
+      <div className="flex h-[100dvh] w-[min(760px,100vw)] flex-col overflow-hidden bg-card shadow-2xl animate-in slide-in-from-right duration-200">
         {/* Шапка */}
         <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
           <div className="flex items-center gap-2.5">
@@ -475,7 +475,7 @@ export default function DealModal({
                       'flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors disabled:opacity-60',
                       botControl.managerControls
                         ? 'bg-amber-50 text-amber-700 hover:bg-amber-100'
-                        : 'bg-[#f1ebfa] text-[#5115a4] hover:bg-[#e7dcf6]'
+                        : 'bg-[var(--brand-soft)] text-[var(--brand)] hover:bg-[#e7dcf6]'
                     )}
                   >
                     {botControl.managerControls ? <UserRound size={12} /> : <Bot size={12} />}
@@ -496,7 +496,7 @@ export default function DealModal({
                         setChatNote(null)
                         setConversationReload((value) => value + 1)
                       }}
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-[#f1ebfa] px-3 py-1.5 font-semibold text-[#5115a4] transition-colors hover:bg-[#e7dcf6]"
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--brand-soft)] px-3 py-1.5 font-semibold text-[var(--brand)] transition-colors hover:bg-[#e7dcf6]"
                     >
                       <RefreshCw size={13} />
                       Повторить
@@ -511,7 +511,7 @@ export default function DealModal({
                       className={cn(
                         'max-w-[85%] rounded-xl px-3 py-1.5 text-[12px] leading-snug whitespace-pre-wrap',
                         m.direction === 'in'
-                          ? 'bg-white text-gray-700 shadow-sm'
+                          ? 'bg-card text-gray-700 shadow-sm'
                           : 'ml-auto text-white brand-gradient'
                       )}
                     >
@@ -555,7 +555,7 @@ export default function DealModal({
             <button
               onClick={handleDelete}
               disabled={isPending}
-              className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[13px] text-gray-400 transition-colors hover:bg-[#f1ebfa] hover:text-[#5115a4] disabled:opacity-50"
+              className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[13px] text-gray-400 transition-colors hover:bg-[var(--brand-soft)] hover:text-[var(--brand)] disabled:opacity-50"
             >
               <Trash2 size={15} />
               Удалить

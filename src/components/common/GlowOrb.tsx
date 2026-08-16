@@ -49,7 +49,7 @@ export default function GlowOrb({
    Радуги здесь быть не должно: загрузка — не праздник. */
 .glow-orb__halo {
   background: conic-gradient(from 0deg,
-    #5115a4, #8a68ad, #c9b3dd, #8a68ad, #5115a4, #5115a4);
+    var(--brand), var(--accent-to), #c9b3dd, var(--accent-to), var(--brand), var(--brand));
   filter: blur(10px);
   opacity: 0.5;
   animation: glow-orb-spin 3.7s linear infinite, glow-orb-pulse 2.3s ease-in-out infinite;
@@ -57,7 +57,7 @@ export default function GlowOrb({
 /* Ядро: тот же градиент, чётко, вращается медленнее и в обратную сторону */
 .glow-orb__core {
   background: conic-gradient(from 90deg,
-    #5115a4, #5115a4, #8a68ad, #c9b3dd, #5115a4);
+    var(--brand), var(--brand), var(--accent-to), #c9b3dd, var(--brand));
   animation: glow-orb-spin 5.3s linear infinite reverse;
   box-shadow: inset 0 0 18px rgba(28, 20, 22, 0.42);
 }
@@ -66,7 +66,7 @@ export default function GlowOrb({
 .glow-orb__drift {
   background: conic-gradient(from 210deg,
     transparent 0deg, #c4a6ea 60deg, transparent 130deg,
-    #ffc9b0 190deg, transparent 260deg, #8a68ad 320deg, transparent 360deg);
+    #ffc9b0 190deg, transparent 260deg, var(--accent-to) 320deg, transparent 360deg);
   mix-blend-mode: screen;
   opacity: 0.45;
   filter: blur(3px);

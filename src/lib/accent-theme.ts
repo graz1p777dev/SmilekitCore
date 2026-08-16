@@ -10,7 +10,7 @@ export const DEFAULT_ACCENT = 'smilekit'
 // Устаревшая cookie со старым идентификатором акцента не пройдёт isAccentId
 // и мягко вернётся к дефолту.
 export const ACCENT_PRESETS = [
-  { id: 'smilekit', label: 'Фиолетовый (Smilekit)', from: '#5115a4', to: '#8a68ad' },
+  { id: 'smilekit', label: 'Фиолетовый (Smilekit)', from: 'var(--brand)', to: 'var(--accent-to)' },
   { id: 'coral', label: 'Коралловый', from: '#e2554d', to: '#ff8a7a' },
   { id: 'graphite', label: 'Графитовый', from: '#4a4042', to: '#776b6e' },
   { id: 'blue', label: 'Синий', from: '#1d4ed8', to: '#3b82f6' },

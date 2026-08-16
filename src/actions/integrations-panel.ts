@@ -91,10 +91,14 @@ async function describeVariables(
 export async function getPanelData(): Promise<PanelData | null> {
   if (!(await requireOwner())) return null
 
-  const [rows, switches] = await Promise.all([
-    vars.listAll(),
-    createAdminClient().from('integrations').select('name, is_active'),
-  ])
+  const rows = await vars.listAll()
+  let switches: { data: unknown[] | null } = { data: null }
+  try {
+    switches = await createAdminClient().from('integrations').select('name, is_active')
+  } catch {
+    // Нет service-ключа (локальная среда) — карточки покажутся без
+    // состояния переключателя, страница не падает.
+  }
   const stored = new Map(rows.map((row) => [row.name, { display: row.display, isSecret: row.isSecret }]))
   const activeByName = new Map(
     ((switches.data ?? []) as { name: string; is_active: boolean }[]).map((row) => [row.name, row.is_active])

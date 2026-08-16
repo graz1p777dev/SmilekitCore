@@ -282,7 +282,7 @@ function FilterGroup({
             className="rounded-xl px-3 py-1.5 text-xs font-medium transition-colors"
             style={{
               background: active ? 'var(--brand)' : 'var(--surface)',
-              color: active ? '#ffffff' : 'var(--ink-2)',
+              color: active ? 'var(--surface)' : 'var(--ink-2)',
               border: `1px solid ${active ? 'var(--brand)' : 'var(--line)'}`,
             }}
           >

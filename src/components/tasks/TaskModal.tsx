@@ -153,7 +153,7 @@ export default function TaskModal({
 
   return (
     <Modal onClose={onClose}>
-      <div className="flex max-h-[88vh] w-[min(560px,92vw)] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+      <div className="flex max-h-[88vh] w-[min(560px,92vw)] flex-col overflow-hidden rounded-2xl bg-card shadow-2xl">
         {/* Шапка */}
         <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
           <h2 className="text-base font-bold text-gray-900">
@@ -266,7 +266,7 @@ export default function TaskModal({
                       'flex flex-col items-center gap-1 rounded-xl border px-2 py-2.5 text-[11px] font-medium transition-all',
                       active
                         ? 'border-transparent text-white brand-gradient shadow-sm'
-                        : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:bg-gray-50',
+                        : 'border-gray-200 bg-card text-gray-500 hover:border-gray-300 hover:bg-gray-50',
                       !canManage && 'cursor-not-allowed opacity-60'
                     )}
                   >
@@ -323,7 +323,7 @@ export default function TaskModal({
                       onClick={() => toggleMember(e.id)}
                       className={cn(
                         'flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors',
-                        checked ? 'bg-[#f1ebfa]' : 'hover:bg-gray-50'
+                        checked ? 'bg-[var(--brand-soft)]' : 'hover:bg-gray-50'
                       )}
                     >
                       <div
@@ -336,7 +336,7 @@ export default function TaskModal({
                       <span
                         className={cn(
                           'flex h-4 w-4 items-center justify-center rounded border',
-                          checked ? 'border-transparent bg-[#5115a4] text-white' : 'border-gray-300'
+                          checked ? 'border-transparent bg-[var(--brand)] text-white' : 'border-gray-300'
                         )}
                       >
                         {checked && <Check size={12} />}

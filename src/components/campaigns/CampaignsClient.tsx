@@ -161,11 +161,11 @@ export default function CampaignsClient({ initialData }: { initialData: Campaign
   const valid = title.trim() && message.trim() && scheduledAt && eligibleCount > 0
 
   return (
-    <div className="min-h-full" style={{ background: 'var(--surface-2)' }}>
+    <div className="min-h-full" style={{ background: 'color-mix(in srgb, var(--surface-2) 45%, transparent)' }}>
       <PageHeader title="Рассылки" subtitle="Возвращайте клиентов, которые ещё не купили" />
       <main className="mx-auto max-w-6xl p-4 md:p-8">
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1.3fr)_minmax(280px,.7fr)]">
-          <section className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-black/5 md:p-7">
+          <section className="rounded-3xl bg-card p-5 shadow-sm ring-1 ring-border md:p-7">
             <div className="mb-6 flex items-start gap-3">
               <div className="flex size-10 items-center justify-center rounded-2xl text-white" style={{ background: 'linear-gradient(145deg,#6f2bd0,#48108f)' }}>
                 <Send className="size-5" />
@@ -247,7 +247,7 @@ export default function CampaignsClient({ initialData }: { initialData: Campaign
                 {audience === 'all' && 'Все клиенты — и купившие, и нет.'}
               </p>
             </div>
-            <div className="border-y border-white/10 bg-white/[.06] p-6">
+            <div className="border-y border-white/10 bg-card/[.06] p-6">
               <div className="flex gap-3"><Clock3 className="mt-0.5 size-4 shrink-0 text-violet-200" /><div><p className="text-xs text-white/55">Отправка</p><p className="mt-1 text-sm font-semibold">{scheduleLabel}</p></div></div>
             </div>
             <div className="space-y-3 p-6 text-sm text-white/75">
@@ -265,12 +265,12 @@ export default function CampaignsClient({ initialData }: { initialData: Campaign
           </div>
           <div className="space-y-3">
             {initialData.campaigns.length === 0 && (
-              <div className="rounded-2xl bg-white px-5 py-10 text-center text-sm ring-1 ring-black/5" style={{ color: 'var(--ink-3)' }}>Рассылок пока нет</div>
+              <div className="rounded-2xl bg-card px-5 py-10 text-center text-sm ring-1 ring-border" style={{ color: 'var(--ink-3)' }}>Рассылок пока нет</div>
             )}
             {initialData.campaigns.map((campaign) => {
               const meta = statusMeta[campaign.status]
               return (
-                <article key={campaign.id} className="grid gap-4 rounded-2xl bg-white p-5 ring-1 ring-black/5 md:grid-cols-[minmax(0,1fr)_auto_auto] md:items-center">
+                <article key={campaign.id} className="grid gap-4 rounded-2xl bg-card p-5 ring-1 ring-border md:grid-cols-[minmax(0,1fr)_auto_auto] md:items-center">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <h3 className="truncate font-semibold" style={{ color: 'var(--ink)' }}>{campaign.title}</h3>
@@ -299,7 +299,7 @@ export default function CampaignsClient({ initialData }: { initialData: Campaign
           <p className="mb-3 text-sm" style={{ color: 'var(--ink-3)' }}>
             Номера здесь никогда не попадут в аудиторию рассылки — даже если ещё не купили.
           </p>
-          <div className="rounded-2xl bg-white p-5 ring-1 ring-black/5">
+          <div className="rounded-2xl bg-card p-5 ring-1 ring-border">
             <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_auto]">
               <Input
                 value={optOutPhone}
@@ -335,7 +335,7 @@ export default function CampaignsClient({ initialData }: { initialData: Campaign
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="font-semibold tabular-nums" style={{ color: 'var(--ink)' }}>+{row.phone}</p>
                       {row.block_bot_replies && (
-                        <span className="flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ color: '#b45309', background: '#fef3c7' }}>
+                        <span className="flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ color: 'var(--warn)', background: '#fef3c7' }}>
                           <Bot className="size-3" /> бот молчит
                         </span>
                       )}

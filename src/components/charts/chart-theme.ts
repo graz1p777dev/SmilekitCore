@@ -12,7 +12,7 @@ import type { CSSProperties } from 'react'
 // графики.
 //                              тон  светлота
 export const CHART_COLORS = {
-  primary: '#5115a4', //   276°   36%  — главная серия: выручка, факт, баланс
+  primary: 'var(--brand)', //   276°   36%  — главная серия: выручка, факт, баланс
   secondary: '#f5a623', //    38°   55%  — вторая серия: обращения, ROMI, показы
   positive: '#2f7d64', //   163°   34%  — план, прибыль (холодный контрапункт)
   negative: '#b5491f', //    17°   42%  — расходы, убыток
@@ -34,7 +34,7 @@ export const CHART_PALETTE = [
 // подписей, чисел в таблицах и легенд берём затемнённые двойники того же
 // тона: все ≥ 6.2:1 на белом.
 export const CHART_TEXT = {
-  primary: '#5115a4', // 10.54:1
+  primary: 'var(--brand)', // 10.54:1
   secondary: '#92400e', //  7.09:1
   positive: '#2b6b56', //  6.29:1
   negative: '#9a3c18', //  6.92:1

@@ -21,7 +21,7 @@ export function ChartTypeToggle({ value, onChange, className }: ChartTypeToggleP
   return (
     <div
       className={cn(
-        'inline-flex items-center gap-1 rounded-xl border border-[#ece5e5] bg-[#f6f2f2] p-1 shadow-sm',
+        'inline-flex items-center gap-1 rounded-xl border border-[var(--line)] bg-[var(--surface-3)] p-1 shadow-sm',
         className
       )}
       role="group"
@@ -35,10 +35,10 @@ export function ChartTypeToggle({ value, onChange, className }: ChartTypeToggleP
           title={label}
           aria-pressed={value === kind}
           className={cn(
-            'flex size-9 items-center justify-center rounded-lg transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#5115a4]',
+            'flex size-9 items-center justify-center rounded-lg transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand)]',
             value === kind
-              ? 'bg-[#5115a4] text-white shadow-sm'
-              : 'bg-white text-[#5115a4] hover:bg-[#faf8f7]'
+              ? 'bg-[var(--brand)] text-white shadow-sm'
+              : 'bg-card text-[var(--brand)] hover:bg-[var(--surface-2)]'
           )}
         >
           <Icon className="size-4" strokeWidth={2.25} />

@@ -47,14 +47,21 @@ async function load(): Promise<Map<string, string>> {
   if (cache && Date.now() - cache.loadedAt < CACHE_TTL_MS) return cache.values
 
   const values = new Map<string, string>()
-  const { data, error } = await createAdminClient()
-    .from(TABLE)
-    .select('name, is_secret, value, value_encrypted')
-  if (error) {
-    // Таблицы ещё нет (миграция не применена) или база недоступна — это не
-    // повод уронить бота: возвращаем пустую карту, и всё работает на
-    // переменных окружения, как до появления этой страницы.
-    log.warn(`переменные из базы недоступны: ${error.message}`)
+  // Таблицы ещё нет, база недоступна или не задан service-ключ — это не
+  // повод уронить бота: возвращаем пустую карту, и всё работает на
+  // переменных окружения, как до появления этой страницы.
+  let data: unknown[] | null = null
+  try {
+    const result = await createAdminClient()
+      .from(TABLE)
+      .select('name, is_secret, value, value_encrypted')
+    if (result.error) {
+      log.warn(`переменные из базы недоступны: ${result.error.message}`)
+      return values
+    }
+    data = result.data
+  } catch (error) {
+    log.warn('переменные из базы недоступны', error)
     return values
   }
 
@@ -116,11 +123,17 @@ export async function list(name: string): Promise<string[]> {
 
 /** Все переменные для страницы настроек — уже безопасные для показа. */
 export async function listAll(): Promise<VariableRow[]> {
-  const { data, error } = await createAdminClient()
-    .from(TABLE)
-    .select('name, integration_id, description, is_secret, value, value_hint, updated_at')
-    .order('name')
-  if (error) return []
+  let data: unknown[] | null = null
+  try {
+    const result = await createAdminClient()
+      .from(TABLE)
+      .select('name, integration_id, description, is_secret, value, value_hint, updated_at')
+      .order('name')
+    if (result.error) return []
+    data = result.data
+  } catch {
+    return []
+  }
 
   return (data ?? []).map((row) => {
     const item = row as {

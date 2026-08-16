@@ -72,7 +72,7 @@ export default function TaskCard({
       onDragEnd={onDragEnd}
       onClick={onClick}
       className={cn(
-        'group relative cursor-pointer select-none rounded-xl border border-gray-100 bg-white p-3 shadow-sm',
+        'group relative cursor-pointer select-none rounded-xl border border-gray-100 bg-card p-3 shadow-sm',
         'transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md hover:border-gray-200',
         dragging && 'opacity-40 rotate-[1.5deg]'
       )}

@@ -175,14 +175,14 @@ export default function WhatsappSettingsClient({ initialConfig }: { initialConfi
   }
 
   return (
-    <div className="min-h-full" style={{ background: 'var(--surface-2)' }}>
+    <div className="min-h-full" style={{ background: 'color-mix(in srgb, var(--surface-2) 45%, transparent)' }}>
       <PageHeader
         title="WhatsApp: шаблоны и доставка"
         subtitle="Тексты бота, группа доставки и внешние интеграции — без деплоя"
       />
       <main className="mx-auto max-w-4xl space-y-6 p-4 md:p-8">
         {/* Панель управления: LLM-инструкция + переключатель JSON/визуальный режим */}
-        <section className="flex flex-wrap items-center justify-between gap-3 rounded-3xl bg-white p-5 shadow-sm ring-1 ring-black/5">
+        <section className="flex flex-wrap items-center justify-between gap-3 rounded-3xl bg-card p-5 shadow-sm ring-1 ring-border">
           <div className="flex items-center gap-2.5">
             <SlidersHorizontal size={18} style={{ color: 'var(--brand-ink)' }} />
             <div>
@@ -201,7 +201,7 @@ export default function WhatsappSettingsClient({ initialConfig }: { initialConfi
         </section>
 
         {jsonMode ? (
-          <section className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-black/5 md:p-7">
+          <section className="rounded-3xl bg-card p-5 shadow-sm ring-1 ring-border md:p-7">
             <h2 className="text-lg font-bold" style={{ color: 'var(--ink)' }}>Весь конфиг одним JSON</h2>
             <p className="mt-1 text-sm" style={{ color: 'var(--ink-3)' }}>
               Удобно вставить ответ от LLM целиком. Сохранённое здесь заменяет шаблоны, правила, промпт доставки и остаток на складе —
@@ -221,7 +221,7 @@ export default function WhatsappSettingsClient({ initialConfig }: { initialConfi
         ) : (
         <>
         {/* Шаблоны */}
-        <section className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-black/5 md:p-7">
+        <section className="rounded-3xl bg-card p-5 shadow-sm ring-1 ring-border md:p-7">
           <h2 className="text-lg font-bold" style={{ color: 'var(--ink)' }}>Шаблоны сообщений</h2>
           <p className="mt-1 text-sm" style={{ color: 'var(--ink-3)' }}>
             Текущий текст, который реально уходит клиенту, — редактируйте прямо здесь.
@@ -247,7 +247,7 @@ export default function WhatsappSettingsClient({ initialConfig }: { initialConfi
         </section>
 
         {/* Группа доставки */}
-        <section className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-black/5 md:p-7">
+        <section className="rounded-3xl bg-card p-5 shadow-sm ring-1 ring-border md:p-7">
           <h2 className="text-lg font-bold" style={{ color: 'var(--ink)' }}>Группа доставки WhatsApp</h2>
           <p className="mt-1 text-sm" style={{ color: 'var(--ink-3)' }}>
             Подтверждённый (и требующий проверки) заказ уходит сюда, вместе с чеком.
@@ -269,15 +269,15 @@ export default function WhatsappSettingsClient({ initialConfig }: { initialConfi
                 <button
                   key={g.id}
                   onClick={() => save({ deliveryGroupId: g.id }, `Группа «${g.name}» выбрана`)}
-                  className="flex w-full items-center justify-between rounded-xl px-3.5 py-2.5 text-left text-sm transition-colors hover:bg-[#f1ebfa]"
+                  className="flex w-full items-center justify-between rounded-xl px-3.5 py-2.5 text-left text-sm transition-colors hover:bg-[var(--brand-soft)]"
                   style={{
-                    background: config.deliveryGroupId === g.id ? '#f1ebfa' : 'var(--surface-2)',
+                    background: config.deliveryGroupId === g.id ? 'var(--brand-soft)' : 'var(--surface-2)',
                     color: 'var(--ink-2)',
                   }}
                 >
                   <span className="truncate">{g.name}</span>
                   {config.deliveryGroupId === g.id && (
-                    <span className="shrink-0 text-xs font-semibold" style={{ color: '#5115a4' }}>выбрана</span>
+                    <span className="shrink-0 text-xs font-semibold" style={{ color: 'var(--brand)' }}>выбрана</span>
                   )}
                 </button>
               ))}
@@ -304,7 +304,7 @@ export default function WhatsappSettingsClient({ initialConfig }: { initialConfi
         </section>
 
         {/* Свои правила: условие → ответ */}
-        <section className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-black/5 md:p-7">
+        <section className="rounded-3xl bg-card p-5 shadow-sm ring-1 ring-border md:p-7">
           <h2 className="text-lg font-bold" style={{ color: 'var(--ink)' }}>Свои правила</h2>
           <p className="mt-1 text-sm" style={{ color: 'var(--ink-3)' }}>
             Условие (по тексту клиента) → готовый ответ. Проверяются раньше встроенного скрипта продаж —
@@ -316,7 +316,7 @@ export default function WhatsappSettingsClient({ initialConfig }: { initialConfi
                 <div className="flex items-start gap-2">
                   <div className="min-w-0 flex-1 space-y-1">
                     <p className="truncate font-mono text-xs" style={{ color: 'var(--ink-3)' }}>
-                      если текст совпадает с: <code className="rounded bg-white px-1.5 py-0.5">{rule.trigger}</code>
+                      если текст совпадает с: <code className="rounded bg-card px-1.5 py-0.5">{rule.trigger}</code>
                     </p>
                     <p className="text-sm whitespace-pre-wrap" style={{ color: 'var(--ink-2)' }}>{rule.reply}</p>
                   </div>
@@ -325,8 +325,8 @@ export default function WhatsappSettingsClient({ initialConfig }: { initialConfi
                       onClick={() => toggleRule(rule.id, !rule.enabled)}
                       className="rounded-lg px-2 py-1 text-xs font-semibold"
                       style={{
-                        background: rule.enabled ? '#dcfce7' : '#f0eaea',
-                        color: rule.enabled ? '#15803d' : '#574d4f',
+                        background: rule.enabled ? 'var(--ok-soft)' : 'var(--surface-3)',
+                        color: rule.enabled ? 'var(--ok)' : 'var(--ink-2)',
                       }}
                     >
                       {rule.enabled ? 'вкл' : 'выкл'}
@@ -362,7 +362,7 @@ export default function WhatsappSettingsClient({ initialConfig }: { initialConfi
         </section>
 
         {/* Товароучёт */}
-        <section className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-black/5 md:p-7">
+        <section className="rounded-3xl bg-card p-5 shadow-sm ring-1 ring-border md:p-7">
           <h2 className="text-lg font-bold" style={{ color: 'var(--ink)' }}>Товароучёт</h2>
           <p className="mt-1 text-sm" style={{ color: 'var(--ink-3)' }}>
             Остаток коробок. Списывается автоматически на каждый подтверждённый чек (1 шт. за заказ).
@@ -387,7 +387,7 @@ export default function WhatsappSettingsClient({ initialConfig }: { initialConfi
         </section>
 
         {/* Внешние CRM */}
-        <section className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-black/5 md:p-7">
+        <section className="rounded-3xl bg-card p-5 shadow-sm ring-1 ring-border md:p-7">
           <h2 className="text-lg font-bold" style={{ color: 'var(--ink)' }}>Внешние CRM (Bitrix и другие)</h2>
           <p className="mt-1 text-sm" style={{ color: 'var(--ink-3)' }}>
             На каждый подтверждённый заказ WhatsApp CRM отправит JSON-вебхук на указанные адреса —

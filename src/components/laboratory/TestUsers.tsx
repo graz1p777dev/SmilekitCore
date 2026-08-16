@@ -12,8 +12,8 @@ const CHAT_POLL_MS = 3000
 
 const btn = 'rounded-xl px-4 py-2 text-sm font-medium disabled:opacity-50'
 const input = 'w-full rounded-xl px-3 py-2 text-sm outline-none'
-const inputStyle = { backgroundColor: '#fdfbfb', color: '#1b1517' } as const
-const muted = { color: '#6b6063' }
+const inputStyle = { backgroundColor: 'var(--surface-2)', color: 'var(--ink)' } as const
+const muted = { color: 'var(--ink-2)' }
 
 function roleLabel(role: string): string {
   if (role === 'user') return 'Клиент'
@@ -146,18 +146,18 @@ export default function TestUsers() {
   }
 
   return (
-    <div className="rounded-2xl overflow-hidden bg-white">
-      <div className="flex items-center justify-between gap-2.5 px-5 py-4" style={{ borderBottom: '1px solid #ebebee' }}>
+    <div className="rounded-2xl overflow-hidden bg-card">
+      <div className="flex items-center justify-between gap-2.5 px-5 py-4" style={{ borderBottom: '1px solid var(--line)' }}>
         <div className="flex items-center gap-2.5">
-          <div className="rounded-lg p-1.5" style={{ backgroundColor: '#5115a4' }}>
+          <div className="rounded-lg p-1.5" style={{ backgroundColor: 'var(--brand)' }}>
             <Beaker size={15} color="#fff" />
           </div>
-          <span className="text-sm font-medium" style={{ color: '#1b1517' }}>
+          <span className="text-sm font-medium" style={{ color: 'var(--ink)' }}>
             Тестовые пользователи
           </span>
         </div>
-        <button onClick={loadUsers} className="rounded-lg p-1.5" style={{ backgroundColor: '#fdfbfb' }} title="Обновить">
-          <RefreshCw size={14} color="#1b1517" />
+        <button onClick={loadUsers} className="rounded-lg p-1.5" style={{ backgroundColor: 'var(--surface-2)' }} title="Обновить">
+          <RefreshCw size={14} color="var(--ink)" />
         </button>
       </div>
 
@@ -168,7 +168,7 @@ export default function TestUsers() {
 
       <div className="grid" style={{ gridTemplateColumns: '300px 1fr' }}>
         {/* Список и создание */}
-        <div className="p-4 flex flex-col gap-3" style={{ borderRight: '1px solid #ebebee' }}>
+        <div className="p-4 flex flex-col gap-3" style={{ borderRight: '1px solid var(--line)' }}>
           <div className="flex flex-col gap-2">
             <input
               className={input}
@@ -188,7 +188,7 @@ export default function TestUsers() {
               onClick={createUser}
               disabled={!name.trim() || busy}
               className={`${btn} flex items-center justify-center gap-2 text-white`}
-              style={{ backgroundColor: '#5115a4' }}
+              style={{ backgroundColor: 'var(--brand)' }}
             >
               <UserPlus size={14} /> Создать
             </button>
@@ -200,14 +200,14 @@ export default function TestUsers() {
               <div
                 key={u.id}
                 className="rounded-xl px-3 py-2 flex items-start justify-between gap-2 cursor-pointer"
-                style={{ backgroundColor: selected?.id === u.id ? '#fdfbfb' : '#fdfbfb' }}
+                style={{ backgroundColor: selected?.id === u.id ? 'var(--surface-2)' : 'var(--surface-2)' }}
                 onClick={() => {
                   setSelected(u)
                   setMessages([])
                 }}
               >
                 <div className="min-w-0">
-                  <p className="text-sm truncate" style={{ color: '#1b1517' }}>{u.name}</p>
+                  <p className="text-sm truncate" style={{ color: 'var(--ink)' }}>{u.name}</p>
                   <p className="text-[11px] truncate" style={muted}>
                     {u.pending_approvals > 0 ? `${u.pending_approvals} на согласовании` : (u.last_message ?? 'нет сообщений')}
                   </p>
@@ -220,7 +220,7 @@ export default function TestUsers() {
                   title="Удалить вместе с перепиской"
                   className="shrink-0 p-1 rounded-lg"
                 >
-                  <Trash2 size={13} color="#7d7174" />
+                  <Trash2 size={13} color="var(--ink-3)" />
                 </button>
               </div>
             ))}
@@ -240,7 +240,7 @@ export default function TestUsers() {
               <div
                 ref={chatRef}
                 className="rounded-xl p-3 flex flex-col gap-2 overflow-y-auto"
-                style={{ backgroundColor: '#fdfbfb', minHeight: 280, maxHeight: 420 }}
+                style={{ backgroundColor: 'var(--surface-2)', minHeight: 280, maxHeight: 420 }}
               >
                 {messages.length === 0 && (
                   <p className="text-sm text-center mt-16" style={muted}>
@@ -253,8 +253,8 @@ export default function TestUsers() {
                     className="rounded-xl px-3 py-2 max-w-[80%]"
                     style={{
                       alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start',
-                      backgroundColor: m.role === 'user' ? '#5115a4' : '#fff',
-                      color: m.role === 'user' ? '#fff' : '#1b1517',
+                      backgroundColor: m.role === 'user' ? 'var(--brand)' : '#fff',
+                      color: m.role === 'user' ? '#fff' : 'var(--ink)',
                     }}
                   >
                     <p className="text-[10px] mb-0.5 opacity-70">{roleLabel(m.role)}</p>
@@ -263,8 +263,8 @@ export default function TestUsers() {
                 ))}
               </div>
 
-              {notice && <p className="text-xs" style={{ color: '#047857' }}>{notice}</p>}
-              {error && <p className="text-xs" style={{ color: '#5115a4' }}>{error}</p>}
+              {notice && <p className="text-xs" style={{ color: 'var(--ok)' }}>{notice}</p>}
+              {error && <p className="text-xs" style={{ color: 'var(--brand)' }}>{error}</p>}
 
               <div className="flex gap-2">
                 <input
@@ -284,7 +284,7 @@ export default function TestUsers() {
                   onClick={sendMessage}
                   disabled={!draft.trim() || busy}
                   className={`${btn} flex items-center gap-2 text-white shrink-0`}
-                  style={{ backgroundColor: '#5115a4' }}
+                  style={{ backgroundColor: 'var(--brand)' }}
                 >
                   <Send size={14} /> Отправить
                 </button>

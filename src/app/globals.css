@@ -439,6 +439,7 @@ tbody tr { transition: background-color 150ms ease; }
   --brand-strong: #360e7f;
   --brand-ink: #5115a4;
   --brand-soft: #f1ebfa;
+  --on-brand: #ffffff;
 
   /* Семантика. Бренд теперь фиолетовый, поэтому красный освободился и
      работает только как сигнал ошибки: #b91c1c даёт 6.5:1 на белом. */
@@ -491,24 +492,26 @@ tbody tr { transition: background-color 150ms ease; }
 }
 
 .dark {
-  /* Глубина — холодный почти-чёрный с фиолетовым подтоном, а не
-     затемнённый бренд. */
-  --paper: #131020;
-  --surface: #1b1730;
-  --surface-2: #241f3c;
-  --surface-3: #2e2749;
-  --line: #332c4d;
-  --line-strong: #453c63;
+  /* Космос, как на витрине Xnova: почти чёрная бумага с фиолетовым
+     подтоном, поверхности чуть светлее и холоднее, линии — призрачные
+     фиолетовые. Яркость несут акцент и свечение, а не поверхности. */
+  --paper: #0c0918;
+  --surface: #151026;
+  --surface-2: #1b1430;
+  --surface-3: #251b40;
+  --line: #2c2248;
+  --line-strong: #3d3060;
 
-  --ink: #f5f2fb;
-  --ink-2: #c6bed8;
-  --ink-3: #9a93ac;
-  --ink-4: #766d88;
+  --ink: #f4f1fc;
+  --ink-2: #c3bad9;
+  --ink-3: #948bac;
+  --ink-4: #6e6588;
 
-  --brand: #a982e0;
-  --brand-strong: #8a68ad;
-  --brand-ink: #c4a6ea;
-  --brand-soft: rgba(138, 104, 173, 0.18);
+  --brand: #a78bfa;
+  --brand-strong: #7c3aed;
+  --brand-ink: #c4b5fd;
+  --brand-soft: rgba(124, 58, 237, 0.16);
+  --on-brand: #ffffff;
 
   --ok: #4ade80;
   --ok-soft: rgba(74, 222, 128, 0.14);
@@ -517,9 +520,9 @@ tbody tr { transition: background-color 150ms ease; }
   --bad: #ff6b6b;
   --bad-soft: rgba(255, 107, 107, 0.14);
 
-  --background: oklch(0.16 0.015 300);
+  --background: oklch(0.13 0.02 300);
   --foreground: oklch(0.96 0.006 300);
-  --card: oklch(0.22 0.02 300);
+  --card: oklch(0.185 0.025 300);
   --card-foreground: oklch(0.96 0.006 300);
   --popover: oklch(0.2 0.02 300 / 97%);
   --popover-foreground: oklch(0.96 0.006 300);
@@ -551,11 +554,33 @@ tbody tr { transition: background-color 150ms ease; }
 }
 
 /* Тёмная тема: фон-бумага тоже уходит в холодный фиолетовый графит */
+.dark {
+  --accent-from: #7c3aed;
+  --accent-to: #a78bfa;
+  --accent-deep: #5b21b6;
+  --accent-shadow: rgba(124, 58, 237, 0.45);
+}
+
+/* Аврора за интерфейсом: два фиолетовых пятна и одно маджента-эхо,
+   как на витрине XPlanet, но приглушённые до рабочего фона. */
 .dark .gradient-mesh {
-  background: linear-gradient(180deg, #1a1530 0%, #131020 55%, #0f0c1a 100%);
+  background:
+    radial-gradient(circle at 78% 12%, rgba(76, 29, 149, 0.28), transparent 34%),
+    radial-gradient(circle at 12% 42%, rgba(109, 40, 217, 0.14), transparent 36%),
+    linear-gradient(180deg, #120d22 0%, #0c0918 58%, #090612 100%);
 }
 .dark .gradient-mesh::before {
-  background: radial-gradient(circle, rgba(110, 40, 199, 0.20), transparent 70%);
+  background: radial-gradient(circle, rgba(124, 58, 237, 0.30), transparent 70%);
+}
+/* Зерно поверх фона — то же приглушённое «плёночное» зерно, что на
+   витрине Xnova: убирает пластиковую гладкость градиентов. */
+.dark .gradient-mesh .mesh-noise {
+  position: absolute;
+  inset: 0;
+  border-radius: 0;
+  filter: none;
+  opacity: 0.07;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 160 160' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.96' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.4'/%3E%3C/svg%3E");
 }
 .dark .gradient-mesh::after {
   background: radial-gradient(circle, rgba(138, 104, 173, 0.12), transparent 70%);
@@ -617,4 +642,29 @@ tbody tr { transition: background-color 150ms ease; }
   @keyframes smilekit-loader-pulse {
     to { transform: scale(0.9); opacity: 0.72; }
   }
+}
+
+/* === Канва сценариев (@xyflow) в тёмной теме === */
+.dark .react-flow__controls {
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 8px 24px -12px rgba(0, 0, 0, 0.5);
+}
+.dark .react-flow__controls-button {
+  background: transparent;
+  border-bottom: 1px solid var(--line);
+}
+.dark .react-flow__controls-button svg { fill: var(--ink-2); }
+.dark .react-flow__controls-button:hover { background: var(--surface-3); }
+.dark .react-flow__edge-path { stroke: var(--ink-4); }
+.dark .react-flow__edge.animated .react-flow__edge-path { stroke: var(--brand); }
+.dark .react-flow__attribution { display: none; }
+
+/* Тёмная тема: стекло становится тёмным фиолетовым, а не белым */
+.dark .glass {
+  background: color-mix(in srgb, var(--surface) 78%, transparent);
+  border: 1px solid var(--line);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25), 0 8px 24px -16px rgba(124, 58, 237, 0.25);
 }

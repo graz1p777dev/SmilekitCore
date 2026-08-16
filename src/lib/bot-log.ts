@@ -164,14 +164,14 @@ export function describe(log: BotActionLog): string {
 const STATUS_COLOR: Record<string, string> = {
   success: '#34d399',
   error: '#f87171',
-  skipped: '#a19698',
+  skipped: 'var(--ink-4)',
   received: '#a982e0',
   // Тестовый лид: бот показал, что сделал бы, но наружу не пошёл.
   dry_run: '#fbbf24',
 }
 
 export function statusColor(status: string): string {
-  return STATUS_COLOR[status] ?? '#7d7174'
+  return STATUS_COLOR[status] ?? 'var(--ink-3)'
 }
 
 export function timeOf(iso: string | null): string {

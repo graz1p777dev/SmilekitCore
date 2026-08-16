@@ -66,7 +66,7 @@ export default function DealCard({
       onDragEnd={onDragEnd}
       onClick={onClick}
       className={cn(
-        'group relative cursor-pointer select-none rounded-xl border border-gray-100 bg-white p-3 shadow-sm',
+        'group relative cursor-pointer select-none rounded-xl border border-gray-100 bg-card p-3 shadow-sm',
         'transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md hover:border-gray-200',
         dragging && 'opacity-40 rotate-[1.5deg]'
       )}
@@ -97,7 +97,7 @@ export default function DealCard({
         </span>
 
         {deal.amount !== null && (
-          <span className="inline-flex items-center rounded-md bg-[#f1ebfa] px-1.5 py-0.5 text-[10px] font-semibold text-[#5115a4]">
+          <span className="inline-flex items-center rounded-md bg-[var(--brand-soft)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--brand)]">
             {formatMoney(deal.amount, deal.currency)}
           </span>
         )}

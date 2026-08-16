@@ -102,16 +102,16 @@ export default function BotTerminal() {
   }
 
   return (
-    <div className="rounded-2xl overflow-hidden bg-white">
-      <div className="flex items-center justify-between gap-3 px-5 py-4" style={{ borderBottom: '1px solid #ece5e5' }}>
+    <div className="rounded-2xl overflow-hidden bg-card">
+      <div className="flex items-center justify-between gap-3 px-5 py-4" style={{ borderBottom: '1px solid var(--line)' }}>
         <div className="flex items-center gap-2.5">
-          <div className="rounded-lg p-1.5" style={{ backgroundColor: '#5115a4' }}>
+          <div className="rounded-lg p-1.5" style={{ backgroundColor: 'var(--brand)' }}>
             <Terminal size={15} color="#fff" />
           </div>
-          <span className="text-sm font-medium" style={{ color: '#1b1517' }}>
+          <span className="text-sm font-medium" style={{ color: 'var(--ink)' }}>
             Что делает бот
           </span>
-          <span className="flex items-center gap-1 text-[11px]" style={{ color: paused ? '#6b6063' : '#047857' }}>
+          <span className="flex items-center gap-1 text-[11px]" style={{ color: paused ? 'var(--ink-2)' : 'var(--ok)' }}>
             <CircleDot size={11} className={paused ? '' : 'animate-pulse'} />
             {paused ? 'пауза' : 'живая лента'}
           </span>
@@ -125,8 +125,8 @@ export default function BotTerminal() {
               className="rounded-lg px-2.5 py-1 text-[11px]"
               style={
                 filter === f.value
-                  ? { backgroundColor: '#5115a4', color: '#fff' }
-                  : { backgroundColor: '#f6f2f2', color: '#574d4f' }
+                  ? { backgroundColor: 'var(--brand)', color: '#fff' }
+                  : { backgroundColor: 'var(--surface-3)', color: 'var(--ink-2)' }
               }
             >
               {f.label}
@@ -135,7 +135,7 @@ export default function BotTerminal() {
           <button
             onClick={() => setPaused((p) => !p)}
             className="rounded-lg p-1.5"
-            style={{ backgroundColor: '#f6f2f2', color: '#1b1517' }}
+            style={{ backgroundColor: 'var(--surface-3)', color: 'var(--ink)' }}
             title={paused ? 'Продолжить' : 'Пауза'}
           >
             {paused ? <Play size={14} /> : <Pause size={14} />}
@@ -146,7 +146,7 @@ export default function BotTerminal() {
               stick.current = true
             }}
             className="rounded-lg p-1.5"
-            style={{ backgroundColor: '#f6f2f2', color: '#1b1517' }}
+            style={{ backgroundColor: 'var(--surface-3)', color: 'var(--ink)' }}
             title="Очистить окно"
           >
             <Eraser size={14} />
@@ -158,11 +158,11 @@ export default function BotTerminal() {
         ref={boxRef}
         onScroll={onScroll}
         className="overflow-y-auto font-mono text-[11.5px] leading-relaxed px-4 py-3"
-        style={{ backgroundColor: '#faf8f7', minHeight: 320, maxHeight: 520 }}
+        style={{ backgroundColor: 'var(--surface-2)', minHeight: 320, maxHeight: 520 }}
       >
-        {error && <p style={{ color: '#5115a4' }}>{error}</p>}
+        {error && <p style={{ color: 'var(--brand)' }}>{error}</p>}
         {!error && rows.length === 0 && (
-          <p style={{ color: '#6b6063' }}>Бот пока ничего не делал. Лента обновляется сама.</p>
+          <p style={{ color: 'var(--ink-2)' }}>Бот пока ничего не делал. Лента обновляется сама.</p>
         )}
 
         {rows.map((row) => (
@@ -171,20 +171,20 @@ export default function BotTerminal() {
               onClick={() => toggleRow(row.id)}
               className="w-full text-left flex gap-2.5 py-0.5 hover:bg-black/[0.04] rounded"
             >
-              <span style={{ color: '#6b6063' }}>{timeOf(row.created_at)}</span>
+              <span style={{ color: 'var(--ink-2)' }}>{timeOf(row.created_at)}</span>
               <span style={{ color: statusColor(row.status) }}>▸</span>
-              <span className="flex-1" style={{ color: '#1b1517' }}>
+              <span className="flex-1" style={{ color: 'var(--ink)' }}>
                 {describe(row)}
               </span>
               {row.amocrm_lead_id && (
-                <span style={{ color: '#6b6063' }} className="shrink-0">
+                <span style={{ color: 'var(--ink-2)' }} className="shrink-0">
                   {row.client_name ?? `лид ${row.amocrm_lead_id}`}
                 </span>
               )}
             </button>
 
             {row.error && (
-              <div className="pl-[86px] pb-0.5" style={{ color: '#5115a4' }}>
+              <div className="pl-[86px] pb-0.5" style={{ color: 'var(--brand)' }}>
                 {row.error}
               </div>
             )}
@@ -192,7 +192,7 @@ export default function BotTerminal() {
             {openId === row.id && (
               <pre
                 className="my-1 ml-[86px] p-2.5 rounded-lg overflow-x-auto text-[10.5px]"
-                style={{ backgroundColor: '#f1ebeb', color: '#574d4f' }}
+                style={{ backgroundColor: '#f1ebeb', color: 'var(--ink-2)' }}
               >
                 {detail ? JSON.stringify(detail, null, 2) : 'Загружаю…'}
               </pre>

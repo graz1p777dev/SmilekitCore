@@ -30,9 +30,10 @@ export default function DashboardShell({ children }: { children: React.ReactNode
 
   return (
     <div className="flex min-h-screen">
-      {/* Плавающий градиентный фон за всем приложением */}
+      {/* Плавающий градиентный фон за всем приложением: аврора + зерно */}
       <div className="gradient-mesh" aria-hidden>
         <div className="mesh-blob" />
+        <div className="mesh-noise" />
       </div>
 
       {/* Затемнение под мобильным drawer */}

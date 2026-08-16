@@ -182,7 +182,7 @@ export default function TasksBoard({ initialTasks, employees, departments, me }:
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Поиск…"
-              className="h-9 w-44 rounded-xl border border-gray-200 bg-white/80 pl-8 pr-3 text-[13px] outline-none transition-colors focus:border-gray-300"
+              className="h-9 w-44 rounded-xl border border-gray-200 bg-card/80 pl-8 pr-3 text-[13px] outline-none transition-colors focus:border-gray-300"
             />
           </div>
 
@@ -192,7 +192,7 @@ export default function TasksBoard({ initialTasks, employees, departments, me }:
               'flex h-9 items-center gap-1.5 rounded-xl border px-3 text-[13px] font-medium transition-colors',
               onlyMine
                 ? 'border-transparent text-white brand-gradient'
-                : 'border-gray-200 bg-white/80 text-gray-600 hover:bg-gray-50'
+                : 'border-gray-200 bg-card/80 text-gray-600 hover:bg-gray-50'
             )}
             title="Показать только мои задачи"
           >
@@ -230,7 +230,7 @@ export default function TasksBoard({ initialTasks, employees, departments, me }:
               className={cn(
                 'flex w-[300px] shrink-0 flex-col rounded-2xl border transition-colors',
                 isTarget && dragId
-                  ? 'border-[#cdb8e8] bg-[#f1ebfa]/60'
+                  ? 'border-[#cdb8e8] bg-[var(--brand-soft)]/60'
                   : 'border-gray-100 bg-gray-50/60'
               )}
             >
@@ -248,7 +248,7 @@ export default function TasksBoard({ initialTasks, employees, departments, me }:
                 </div>
                 <button
                   onClick={() => openNew(col.key)}
-                  className="rounded-lg p-1 text-gray-400 transition-colors hover:bg-white hover:text-gray-600"
+                  className="rounded-lg p-1 text-gray-400 transition-colors hover:bg-card hover:text-gray-600"
                   title="Добавить в колонку"
                 >
                   <Plus size={15} />
@@ -272,7 +272,7 @@ export default function TasksBoard({ initialTasks, employees, departments, me }:
                     }}
                   >
                     {dragId && isTarget && dragOver?.beforeId === task.id && (
-                      <div className="mb-2 h-[3px] rounded-full bg-[#5115a4]" />
+                      <div className="mb-2 h-[3px] rounded-full bg-[var(--brand)]" />
                     )}
                     <TaskCard
                       task={task}
@@ -287,7 +287,7 @@ export default function TasksBoard({ initialTasks, employees, departments, me }:
 
                 {/* Плейсхолдер в конце / пустая колонка */}
                 {dragId && isTarget && dragOver?.beforeId === null && (
-                  <div className="h-[3px] rounded-full bg-[#5115a4]" />
+                  <div className="h-[3px] rounded-full bg-[var(--brand)]" />
                 )}
                 {list.length === 0 && !dragId && (
                   <button

@@ -28,11 +28,11 @@ function SmallCard({ label, value, icon, accent }: SmallCardProps) {
       <div className="min-w-0">
         <p
           className="font-bold tabular-nums truncate"
-          style={{ fontSize: 20, color: '#1b1517', lineHeight: 1.1 }}
+          style={{ fontSize: 20, color: 'var(--ink)', lineHeight: 1.1 }}
         >
           {value}
         </p>
-        <p style={{ fontSize: 11, color: '#7d7174', marginTop: 2 }}>{label}</p>
+        <p style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>{label}</p>
       </div>
     </div>
   )
@@ -45,7 +45,7 @@ export default function TodayCards({ stats }: TodayCardsProps) {
         label="ФВ сегодня"
         value={formatNumber(stats.fv_today)}
         icon={<CalendarCheck style={{ width: 16, height: 16 }} />}
-        accent="#5115a4"
+        accent="var(--brand)"
       />
       <SmallCard
         label="Продаж сегодня"
@@ -58,7 +58,7 @@ export default function TodayCards({ stats }: TodayCardsProps) {
           <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>Выручка сегодня</span>
           <span
             className="font-bold tabular-nums"
-            style={{ fontSize: 16, color: '#ffffff' }}
+            style={{ fontSize: 16, color: 'var(--on-brand)' }}
           >
             {formatMoney(stats.revenue_today)}
           </span>

@@ -71,7 +71,7 @@ export function SmilekitBotEventsTerminal() {
     <div className="overflow-hidden rounded-2xl" style={{ border: '1px solid var(--line)' }}>
       <div className="flex items-center gap-2.5 px-5 py-4" style={{ backgroundColor: '#17102a' }}>
         <div className="flex h-8 w-8 items-center justify-center rounded-xl" style={{ backgroundColor: 'var(--brand-ink)' }}>
-          <Terminal size={15} color="#ffffff" />
+          <Terminal size={15} color="var(--surface)" />
         </div>
         <div>
           <h2 className="text-sm font-semibold text-white">Живой журнал бота</h2>

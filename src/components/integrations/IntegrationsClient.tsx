@@ -108,7 +108,7 @@ export default function IntegrationsClient({ initial }: { initial: PanelData }) 
   const groups: IntegrationView['kind'][] = ['channel', 'ai', 'module']
 
   return (
-    <div className="min-h-full" style={{ background: 'var(--surface-2)' }}>
+    <div className="min-h-full">
       <PageHeader
         title="Интеграции"
         subtitle="Каналы, модели и переменные — подключение без правки кода и без деплоя"
@@ -116,19 +116,19 @@ export default function IntegrationsClient({ initial }: { initial: PanelData }) 
 
       <main className="mx-auto max-w-5xl space-y-6 p-4 md:p-8">
         {!data.encryptionReady && (
-          <section className="flex items-start gap-3 rounded-3xl bg-amber-50 p-5 ring-1 ring-amber-200">
-            <TriangleAlert size={18} className="mt-0.5 shrink-0 text-amber-600" />
-            <div className="text-sm text-amber-900">
+          <section className="flex items-start gap-3 rounded-3xl p-5 ring-1 ring-[var(--warn)]/40" style={{ background: 'var(--warn-soft)' }}>
+            <TriangleAlert size={18} className="mt-0.5 shrink-0" style={{ color: 'var(--warn)' }} />
+            <div className="text-sm" style={{ color: 'var(--ink)' }}>
               <p className="font-semibold">Секреты сохранять некуда</p>
               <p className="mt-1">
-                Задайте переменную <code className="rounded bg-amber-100 px-1">INTEGRATION_ENCRYPTION_KEY</code> в
+                Задайте переменную <code className="rounded px-1" style={{ background: 'var(--surface-3)' }}>INTEGRATION_ENCRYPTION_KEY</code> в
                 Railway — ею шифруются токены. Это единственный ключ, который остаётся в панели хостинга.
               </p>
             </div>
           </section>
         )}
 
-        <section className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-black/5">
+        <section className="rounded-3xl bg-card p-5 shadow-sm ring-1 ring-border">
           <div className="flex items-center gap-2.5">
             <Sparkles size={18} style={{ color: 'var(--brand-ink)' }} />
             <div>
@@ -170,7 +170,7 @@ export default function IntegrationsClient({ initial }: { initial: PanelData }) 
               </h2>
 
               {items.map((integration) => (
-                <article key={integration.id} className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-black/5 md:p-6">
+                <article key={integration.id} className="rounded-3xl bg-card p-5 shadow-sm ring-1 ring-border md:p-6">
                   <header className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
@@ -181,7 +181,7 @@ export default function IntegrationsClient({ initial }: { initial: PanelData }) 
                         {integration.abilities.map((ability) => (
                           <span
                             key={ability}
-                            className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-600"
+                            className="rounded-full px-2 py-0.5 text-[11px] font-medium" style={{ background: 'var(--surface-3)', color: 'var(--ink-2)' }}
                           >
                             {ability}
                           </span>
@@ -212,13 +212,13 @@ export default function IntegrationsClient({ initial }: { initial: PanelData }) 
                   </header>
 
                   {integration.variables.length > 0 && (
-                    <div className="mt-4 space-y-3 border-t border-gray-100 pt-4">
+                    <div className="mt-4 space-y-3 border-t border-[var(--line)] pt-4">
                       {integration.variables.map((variable) => (
                         <div key={variable.name} className="grid gap-2 md:grid-cols-[minmax(0,320px)_1fr_auto] md:items-center">
                           <div className="min-w-0">
                             <p className="truncate font-mono text-xs font-semibold" style={{ color: 'var(--ink)' }}>
                               {variable.name}
-                              {variable.required && <span className="ml-1 text-red-500">*</span>}
+                              {variable.required && <span className="ml-1" style={{ color: 'var(--bad)' }}>*</span>}
                             </p>
                             <p className="text-xs" style={{ color: 'var(--ink-3)' }}>
                               {variable.description}
@@ -265,7 +265,7 @@ export default function IntegrationsClient({ initial }: { initial: PanelData }) 
           )
         })}
 
-        <section className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-black/5 md:p-6">
+        <section className="rounded-3xl bg-card p-5 shadow-sm ring-1 ring-border md:p-6">
           <div className="flex items-center gap-2.5">
             <KeyRound size={18} style={{ color: 'var(--brand-ink)' }} />
             <div>
@@ -281,7 +281,7 @@ export default function IntegrationsClient({ initial }: { initial: PanelData }) 
           {data.extraVariables.length > 0 && (
             <div className="mt-4 space-y-2">
               {data.extraVariables.map((variable) => (
-                <div key={variable.name} className="flex items-center justify-between gap-3 rounded-2xl bg-gray-50 px-4 py-2.5">
+                <div key={variable.name} className="flex items-center justify-between gap-3 rounded-2xl px-4 py-2.5" style={{ background: 'var(--surface-2)' }}>
                   <div className="min-w-0">
                     <p className="truncate font-mono text-xs font-semibold" style={{ color: 'var(--ink)' }}>
                       {variable.name}
@@ -368,14 +368,14 @@ function markSet(data: PanelData, name: string, isSecret: boolean, value: string
 function StatusBadge({ configured, missing }: { configured: boolean; missing: string[] }) {
   if (configured) {
     return (
-      <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+      <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ background: 'var(--ok-soft)', color: 'var(--ok)' }}>
         настроено
       </span>
     )
   }
   return (
     <span
-      className="rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-600"
+      className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ background: 'var(--bad-soft)', color: 'var(--bad)' }}
       title={missing.join(', ')}
     >
       не хватает: {missing.length}

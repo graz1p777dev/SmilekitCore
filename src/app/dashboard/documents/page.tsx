@@ -20,8 +20,8 @@ import {
 } from '@/actions/documents'
 import type { Document, DocumentFolder, UserRole } from '@/types'
 
-const navy = '#1b1517'
-const steel = '#6b6063'
+const navy = 'var(--ink)'
+const steel = 'var(--ink-2)'
 
 function formatBytes(bytes: number | null): string {
   if (!bytes) return '—'
@@ -175,8 +175,8 @@ export default function DocumentsPage() {
 
       {/* Сетка */}
       <div
-        className="rounded-2xl bg-white p-5 min-h-[300px]"
-        style={{ border: dragOver ? '2px dashed #5115a4' : '1px solid var(--border)' }}
+        className="rounded-2xl bg-card p-5 min-h-[300px]"
+        style={{ border: dragOver ? '2px dashed var(--brand)' : '1px solid var(--border)' }}
         onDragOver={e => { if (canWrite) { e.preventDefault(); setDragOver(true) } }}
         onDragLeave={() => setDragOver(false)}
         onDrop={e => {
@@ -200,7 +200,7 @@ export default function DocumentsPage() {
                 style={{ border: '1px solid var(--border)' }}
                 onClick={() => goToFolder(folder.id)}
               >
-                <Folder size={28} color="#5115a4" />
+                <Folder size={28} color="var(--brand)" />
                 <span className="text-sm font-medium truncate" style={{ color: navy }} title={folder.name}>
                   {folder.name}
                 </span>
@@ -265,7 +265,7 @@ export default function DocumentsPage() {
       {/* Новая папка */}
       {newFolderOpen && (
         <Modal onClose={() => setNewFolderOpen(false)}>
-          <div className="rounded-2xl bg-white p-5 w-80 flex flex-col gap-3">
+          <div className="rounded-2xl bg-card p-5 w-80 flex flex-col gap-3">
             <h3 className="font-bold text-sm" style={{ color: navy }}>Новая папка</h3>
             <Input
               autoFocus
@@ -285,7 +285,7 @@ export default function DocumentsPage() {
       {/* Просмотр документа */}
       {preview && (
         <Modal onClose={() => setPreview(null)}>
-          <div className="rounded-2xl bg-white p-5 w-[min(90vw,700px)] flex flex-col gap-3">
+          <div className="rounded-2xl bg-card p-5 w-[min(90vw,700px)] flex flex-col gap-3">
             <div className="flex items-center justify-between">
               <h3 className="font-bold text-sm truncate" style={{ color: navy }}>{preview.doc.name}</h3>
               <button onClick={() => setPreview(null)} style={{ color: steel }}><X size={18} /></button>

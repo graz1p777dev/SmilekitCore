@@ -70,7 +70,7 @@ export default function CommandPalette() {
             placeholder="Поиск по системе..."
             className="flex-1 bg-transparent text-gray-100 placeholder:text-gray-500 text-sm outline-none"
           />
-          <kbd className="text-[10px] text-gray-600 bg-white/5 border border-white/10 px-1.5 py-0.5 rounded font-mono">ESC</kbd>
+          <kbd className="text-[10px] text-gray-600 bg-card/5 border border-white/10 px-1.5 py-0.5 rounded font-mono">ESC</kbd>
         </div>
 
         {/* Results */}
@@ -84,11 +84,11 @@ export default function CommandPalette() {
               return (
                 <button
                   key={cmd.href}
-                  className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors ${isSelected ? 'bg-[#5115a4]/20' : 'hover:bg-white/5'}`}
+                  className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors ${isSelected ? 'bg-[var(--brand)]/20' : 'hover:bg-card/5'}`}
                   onClick={() => execute(cmd.href)}
                   onMouseEnter={() => setSelected(i)}
                 >
-                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${isSelected ? 'bg-[#5115a4]' : 'bg-white/8'}`}>
+                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${isSelected ? 'bg-[var(--brand)]' : 'bg-card/8'}`}>
                     <Icon className={`w-3.5 h-3.5 ${isSelected ? 'text-white' : 'text-gray-400'}`} />
                   </div>
                   <div>
@@ -96,7 +96,7 @@ export default function CommandPalette() {
                     <p className="text-[11px] text-gray-600">{cmd.category}</p>
                   </div>
                   {isSelected && (
-                    <kbd className="ml-auto text-[10px] text-gray-500 bg-white/5 border border-white/10 px-1.5 py-0.5 rounded font-mono">↵</kbd>
+                    <kbd className="ml-auto text-[10px] text-gray-500 bg-card/5 border border-white/10 px-1.5 py-0.5 rounded font-mono">↵</kbd>
                   )}
                 </button>
               )
@@ -106,9 +106,9 @@ export default function CommandPalette() {
 
         {/* Footer */}
         <div className="px-4 py-2.5 border-t border-white/5 flex items-center gap-4 text-[11px] text-gray-600">
-          <span><kbd className="font-mono bg-white/5 px-1 rounded">↑↓</kbd> навигация</span>
-          <span><kbd className="font-mono bg-white/5 px-1 rounded">↵</kbd> открыть</span>
-          <span><kbd className="font-mono bg-white/5 px-1 rounded">esc</kbd> закрыть</span>
+          <span><kbd className="font-mono bg-card/5 px-1 rounded">↑↓</kbd> навигация</span>
+          <span><kbd className="font-mono bg-card/5 px-1 rounded">↵</kbd> открыть</span>
+          <span><kbd className="font-mono bg-card/5 px-1 rounded">esc</kbd> закрыть</span>
         </div>
       </div>
     </div>

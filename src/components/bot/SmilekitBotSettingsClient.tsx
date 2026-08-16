@@ -132,7 +132,7 @@ export function SmilekitBotSettingsClient({ settings }: { settings: SmilekitBotS
       <div
         className="sticky bottom-4 flex flex-wrap items-center gap-3 px-4 py-3"
         style={{
-          background: '#ffffff',
+          background: 'var(--surface)',
           border: '1px solid var(--line)',
           borderRadius: 'var(--radius-2xl)',
           boxShadow: '0 12px 32px -14px rgba(28,20,22,0.22)',
@@ -156,7 +156,7 @@ export function SmilekitBotSettingsClient({ settings }: { settings: SmilekitBotS
 
 function SectionCard({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
   return (
-    <div className="overflow-hidden rounded-2xl bg-white" style={{ border: '1px solid var(--line)' }}>
+    <div className="overflow-hidden rounded-2xl bg-card" style={{ border: '1px solid var(--line)' }}>
       <div className="flex items-center gap-2.5 px-5 py-4" style={{ borderBottom: '1px solid var(--line)' }}>
         <div className="flex h-8 w-8 items-center justify-center rounded-xl" style={{ backgroundColor: 'var(--brand-ink)' }}>
           {icon}
@@ -184,7 +184,7 @@ function PromptCard({
   const tight = left <= SMILEKIT_BOT_PROMPT_LIMIT * 0.05
 
   return (
-    <div className="rounded-2xl bg-white p-5" style={{ border: '1px solid var(--line)' }}>
+    <div className="rounded-2xl bg-card p-5" style={{ border: '1px solid var(--line)' }}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <Bot size={14} style={{ color: 'var(--brand-ink)' }} />

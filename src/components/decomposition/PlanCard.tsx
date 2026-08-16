@@ -18,9 +18,9 @@ export default function PlanCard({ data, view }: Props) {
   const { year, month, daysInMonth, workDays, daysPassed, progressPct, status } = period
 
   return (
-    <div className="rounded-2xl overflow-hidden shadow-sm border" style={{ backgroundColor: '#fff', borderColor: '#ebebee' }}>
+    <div className="rounded-2xl overflow-hidden shadow-sm border" style={{ backgroundColor: '#fff', borderColor: 'var(--line)' }}>
       {/* Шапка */}
-      <div className="px-6 py-4 flex items-center justify-between" style={{ background: 'linear-gradient(135deg, #5115a4 0%, #ff7a2f 100%)' }}>
+      <div className="px-6 py-4 flex items-center justify-between" style={{ background: 'linear-gradient(135deg, var(--brand) 0%, #ff7a2f 100%)' }}>
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: 'rgba(255,255,255,0.15)' }}>
             {view === 'company' ? <TrendingUp className="w-5 h-5 text-white" /> : <Users className="w-5 h-5 text-white" />}
@@ -59,29 +59,29 @@ export default function PlanCard({ data, view }: Props) {
       <div className="px-4 py-4 md:px-6">
         <div className="grid grid-cols-2 gap-4 mb-4 lg:grid-cols-4">
           <div>
-            <p className="text-[11px] mb-1 flex items-center gap-1" style={{ color: '#7d7174' }}><Calendar className="w-3 h-3" /> Начало</p>
-            <p className="text-sm font-semibold" style={{ color: '#1b1517' }}>{fmtDate(year, month, 1)}</p>
+            <p className="text-[11px] mb-1 flex items-center gap-1" style={{ color: 'var(--ink-3)' }}><Calendar className="w-3 h-3" /> Начало</p>
+            <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>{fmtDate(year, month, 1)}</p>
           </div>
           <div>
-            <p className="text-[11px] mb-1 flex items-center gap-1" style={{ color: '#7d7174' }}><Calendar className="w-3 h-3" /> Конец</p>
-            <p className="text-sm font-semibold" style={{ color: '#1b1517' }}>{fmtDate(year, month, daysInMonth)}</p>
+            <p className="text-[11px] mb-1 flex items-center gap-1" style={{ color: 'var(--ink-3)' }}><Calendar className="w-3 h-3" /> Конец</p>
+            <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>{fmtDate(year, month, daysInMonth)}</p>
           </div>
           <div>
-            <p className="text-[11px] mb-1 flex items-center gap-1" style={{ color: '#7d7174' }}><Clock className="w-3 h-3" /> Рабочих дней</p>
-            <p className="text-sm font-semibold" style={{ color: '#1b1517' }}>{workDays}</p>
+            <p className="text-[11px] mb-1 flex items-center gap-1" style={{ color: 'var(--ink-3)' }}><Clock className="w-3 h-3" /> Рабочих дней</p>
+            <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>{workDays}</p>
           </div>
           <div>
-            <p className="text-[11px] mb-1" style={{ color: '#7d7174' }}>Прошло дней</p>
-            <p className="text-sm font-semibold" style={{ color: '#1b1517' }}>{daysPassed} / {daysInMonth}</p>
+            <p className="text-[11px] mb-1" style={{ color: 'var(--ink-3)' }}>Прошло дней</p>
+            <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>{daysPassed} / {daysInMonth}</p>
           </div>
         </div>
         <div>
           <div className="flex items-center justify-between mb-1.5">
-            <p className="text-[11px]" style={{ color: '#7d7174' }}>Прогресс периода</p>
-            <p className="text-[11px] font-bold" style={{ color: '#5115a4' }}>{progressPct}%</p>
+            <p className="text-[11px]" style={{ color: 'var(--ink-3)' }}>Прогресс периода</p>
+            <p className="text-[11px] font-bold" style={{ color: 'var(--brand)' }}>{progressPct}%</p>
           </div>
-          <div className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: '#fdfbfb' }}>
-            <div className="h-full rounded-full transition-all" style={{ width: `${progressPct}%`, background: 'linear-gradient(90deg, #5115a4, #10b981)' }} />
+          <div className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--surface-2)' }}>
+            <div className="h-full rounded-full transition-all" style={{ width: `${progressPct}%`, background: 'linear-gradient(90deg, var(--brand), #10b981)' }} />
           </div>
         </div>
       </div>

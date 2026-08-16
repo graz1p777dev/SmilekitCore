@@ -22,10 +22,10 @@ export default function BlockError({ error, reset, title = 'Ошибка заг�
         minHeight: 100,
       }}
     >
-      <AlertTriangle style={{ width: 20, height: 20, color: '#5115a4' }} />
+      <AlertTriangle style={{ width: 20, height: 20, color: 'var(--brand)' }} />
       <div className="text-center">
-        <p className="font-medium" style={{ fontSize: 13, color: '#1b1517' }}>{title}</p>
-        <p style={{ fontSize: 12, color: '#7d7174', marginTop: 2 }}>
+        <p className="font-medium" style={{ fontSize: 13, color: 'var(--ink)' }}>{title}</p>
+        <p style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 2 }}>
           {error.message || 'Что-то пошло не так'}
         </p>
       </div>
@@ -33,10 +33,10 @@ export default function BlockError({ error, reset, title = 'Ошибка заг�
         onClick={reset}
         className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 transition-colors"
         style={{
-          backgroundColor: '#fef2f2',
+          backgroundColor: 'var(--bad-soft)',
           border: '1px solid #fecaca',
           fontSize: 12,
-          color: '#5115a4',
+          color: 'var(--brand)',
           cursor: 'pointer',
         }}
       >

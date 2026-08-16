@@ -15,7 +15,7 @@ import {
 // ─── Константы ────────────────────────────────────────────────────────────────
 
 const GREEN = '#1b7a4b'
-const RED   = '#5115a4'
+const RED   = 'var(--brand)'
 const AMBER = '#b5732f'
 
 const MONO = "'IBM Plex Mono', monospace"
@@ -75,7 +75,7 @@ function MoneyInput({ label, value, onChange, disabled, unit }: {
 }) {
   return (
     <label style={{ display: 'block', marginBottom: '14px' }}>
-      <span style={{ fontSize: '12px', fontWeight: 600, color: '#574d4f' }}>{label}</span>
+      <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--ink-2)' }}>{label}</span>
       <div style={{ position: 'relative', marginTop: '6px' }}>
         <input
           type="number"
@@ -83,12 +83,12 @@ function MoneyInput({ label, value, onChange, disabled, unit }: {
           onChange={e => onChange(e.target.value)}
           disabled={disabled}
           style={{
-            width: '100%', padding: '11px 52px 11px 13px', border: '1px solid #e8dfe0',
+            width: '100%', padding: '11px 52px 11px 13px', border: '1px solid var(--line)',
             borderRadius: '10px', fontSize: '15px', fontFamily: MONO, fontWeight: 500,
-            background: disabled ? '#fdfbfb' : '#fff', color: '#1b1517', boxSizing: 'border-box',
+            background: disabled ? 'var(--surface-2)' : '#fff', color: 'var(--ink)', boxSizing: 'border-box',
           }}
         />
-        <span style={{ position: 'absolute', right: '13px', top: '50%', transform: 'translateY(-50%)', fontSize: '12px', color: '#7d7174', fontWeight: 600 }}>{unit}</span>
+        <span style={{ position: 'absolute', right: '13px', top: '50%', transform: 'translateY(-50%)', fontSize: '12px', color: 'var(--ink-3)', fontWeight: 600 }}>{unit}</span>
       </div>
     </label>
   )
@@ -201,9 +201,9 @@ export default function DecompositionPage() {
     // сужается к продажам, цвет набирает плотность. Тёмных плашек нет.
     { label: 'Обращения', sub: 'вход воронки',  raw: funnel.raw.obr,  val: funnel.plan.obr,  color: '#ffab1f' },
     { label: 'Лиды',      sub: 'квалификация',  raw: funnel.raw.lid,  val: funnel.plan.lid,  color: '#ff7a2f' },
-    { label: 'НВ',        sub: 'назнач. визит', raw: funnel.raw.nv,   val: funnel.plan.nv,   color: '#8a68ad' },
-    { label: 'ФВ',        sub: 'факт. визит',   raw: funnel.raw.fv,   val: funnel.plan.fv,   color: '#5115a4' },
-    { label: 'Продажи',   sub: 'закрытие',      raw: funnel.raw.sale, val: funnel.plan.sale, color: '#5115a4' },
+    { label: 'НВ',        sub: 'назнач. визит', raw: funnel.raw.nv,   val: funnel.plan.nv,   color: 'var(--accent-to)' },
+    { label: 'ФВ',        sub: 'факт. визит',   raw: funnel.raw.fv,   val: funnel.plan.fv,   color: 'var(--brand)' },
+    { label: 'Продажи',   sub: 'закрытие',      raw: funnel.raw.sale, val: funnel.plan.sale, color: 'var(--brand)' },
   ]
 
   // План vs Факт
@@ -250,7 +250,7 @@ export default function DecompositionPage() {
       devFmt:    dev !== null ? Math.abs(dev).toFixed(1) + ' п.п.' : '',
       devArrow:  dev === null ? '' : (above ? '▲' : '▼'),
       devColor:  above ? GREEN : RED,
-      factColor: factConv === null ? '#6b6063' : (above ? '#1b1517' : RED),
+      factColor: factConv === null ? 'var(--ink-2)' : (above ? 'var(--ink)' : RED),
       tileBg:    factConv === null ? '#fff' : (above ? '#f4faf6' : '#fdf5f4'),
     }
   })
@@ -278,58 +278,58 @@ export default function DecompositionPage() {
 
   if (planLoading) {
     return (
-      <div style={{ minHeight: '100vh', background: '#f0eaea', padding: '20px' }}>
+      <div style={{ minHeight: '100vh', background: 'var(--surface-3)', padding: '20px' }}>
         {[110, 300, 240, 400].map((h, i) => (
-          <div key={i} className="animate-pulse" style={{ height: h, background: '#ece5e5', borderRadius: '16px', marginBottom: '16px' }} />
+          <div key={i} className="animate-pulse" style={{ height: h, background: 'var(--line)', borderRadius: '16px', marginBottom: '16px' }} />
         ))}
       </div>
     )
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f0eaea', paddingBottom: '56px', fontFamily: "'Golos Text', system-ui, sans-serif", color: '#1b1517' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--surface-3)', paddingBottom: '56px', fontFamily: "'Golos Text', system-ui, sans-serif", color: 'var(--ink)' }}>
 
       {/* ===== HEADER ===== */}
-      <header style={{ background: '#ffffff', color: '#1b1517', borderBottom: '1px solid #ece5e5', padding: '20px 40px', display: 'flex', alignItems: 'center', gap: '28px', flexWrap: 'wrap', boxShadow: '0 1px 2px rgba(28,20,22,0.04)' }}>
+      <header style={{ background: 'var(--surface)', color: 'var(--ink)', borderBottom: '1px solid var(--line)', padding: '20px 40px', display: 'flex', alignItems: 'center', gap: '28px', flexWrap: 'wrap', boxShadow: '0 1px 2px rgba(28,20,22,0.04)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1, minWidth: '260px' }}>
-          <div style={{ width: '46px', height: '46px', borderRadius: '12px', background: '#5115a4', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '3px', flexShrink: 0 }}>
-            <span style={{ display: 'block', width: '22px', height: '3px', borderRadius: '2px', background: '#f0eaea' }} />
+          <div style={{ width: '46px', height: '46px', borderRadius: '12px', background: 'var(--brand)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '3px', flexShrink: 0 }}>
+            <span style={{ display: 'block', width: '22px', height: '3px', borderRadius: '2px', background: 'var(--surface-3)' }} />
             <span style={{ display: 'block', width: '15px', height: '3px', borderRadius: '2px', background: 'rgba(255,255,255,0.55)' }} />
             <span style={{ display: 'block', width: '8px', height: '3px', borderRadius: '2px', background: 'rgba(255,255,255,0.55)' }} />
           </div>
           <div>
-            <div style={{ fontSize: '12px', letterSpacing: '0.14em', textTransform: 'uppercase', color: '#7d7174', fontWeight: 600 }}>Smilekit</div>
+            <div style={{ fontSize: '12px', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-3)', fontWeight: 600 }}>Smilekit</div>
             <div style={{ fontSize: '21px', fontWeight: 700, letterSpacing: '-0.01em', marginTop: '2px' }}>Общая декомпозиция компании</div>
           </div>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'flex-end', gap: '14px', flexWrap: 'wrap' }}>
           <label style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <span style={{ fontSize: '11px', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#574d4f', fontWeight: 600 }}>Начало периода</span>
+            <span style={{ fontSize: '11px', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--ink-2)', fontWeight: 600 }}>Начало периода</span>
             <input
               type="date"
               value={dateStart}
               onChange={e => setDateStart(e.target.value)}
               disabled={!isOwner}
-              style={{ background: '#faf8f7', border: '1px solid #e8dfe0', color: '#1b1517', borderRadius: '10px', padding: '9px 12px', fontSize: '14px' }}
+              style={{ background: 'var(--surface-2)', border: '1px solid var(--line)', color: 'var(--ink)', borderRadius: '10px', padding: '9px 12px', fontSize: '14px' }}
             />
           </label>
-          <span style={{ color: '#a19698', fontSize: '18px', paddingBottom: '9px' }}>→</span>
+          <span style={{ color: 'var(--ink-4)', fontSize: '18px', paddingBottom: '9px' }}>→</span>
           <label style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <span style={{ fontSize: '11px', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#574d4f', fontWeight: 600 }}>Конец периода</span>
+            <span style={{ fontSize: '11px', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--ink-2)', fontWeight: 600 }}>Конец периода</span>
             <input
               type="date"
               value={dateEnd}
               onChange={e => setDateEnd(e.target.value)}
               disabled={!isOwner}
-              style={{ background: '#faf8f7', border: '1px solid #e8dfe0', color: '#1b1517', borderRadius: '10px', padding: '9px 12px', fontSize: '14px' }}
+              style={{ background: 'var(--surface-2)', border: '1px solid var(--line)', color: 'var(--ink)', borderRadius: '10px', padding: '9px 12px', fontSize: '14px' }}
             />
           </label>
           {isOwner && (
             <button
               onClick={handleSave}
               disabled={saving}
-              style={{ background: saving ? '#574d4f' : (planId ? '#5115a4' : '#5115a4'), color: '#fff', border: 'none', borderRadius: '9px', padding: '11px 20px', fontSize: '14px', fontWeight: 600, cursor: saving ? 'default' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+              style={{ background: saving ? 'var(--ink-2)' : (planId ? 'var(--brand)' : 'var(--brand)'), color: '#fff', border: 'none', borderRadius: '9px', padding: '11px 20px', fontSize: '14px', fontWeight: 600, cursor: saving ? 'default' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
             >
               <span style={{ fontSize: '16px', lineHeight: 1 }}>{planId ? '✎' : '+'}</span>
               {saving ? 'Сохранение…' : (planId ? 'Сохранить план' : 'Создать план')}
@@ -347,31 +347,31 @@ export default function DecompositionPage() {
           <section style={{ ...cardStyle, padding: '24px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
               <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700 }}>Входные параметры</h2>
-              <span style={{ fontSize: '11px', fontWeight: 600, padding: '4px 9px', borderRadius: '999px', background: isOwner ? '#faf8f7' : '#faf8f7', color: isOwner ? '#5115a4' : '#6b6063', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+              <span style={{ fontSize: '11px', fontWeight: 600, padding: '4px 9px', borderRadius: '999px', background: isOwner ? 'var(--surface-2)' : 'var(--surface-2)', color: isOwner ? 'var(--brand)' : 'var(--ink-2)', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
                 {isOwner ? '🔓 Владелец' : '🔒 Наблюдатель'}
               </span>
             </div>
-            <p style={{ margin: '0 0 18px', fontSize: '12.5px', color: '#6b6063' }}>
+            <p style={{ margin: '0 0 18px', fontSize: '12.5px', color: 'var(--ink-2)' }}>
               {isOwner ? 'Вы можете изменять параметры декомпозиции' : 'Только владелец может изменять параметры'}
             </p>
 
             <MoneyInput label="Целевая выручка" value={targetRevenue} onChange={setTargetRevenue} disabled={!isOwner} unit="сом" />
             <MoneyInput label="Средний чек" value={avgCheck} onChange={setAvgCheck} disabled={!isOwner} unit="сом" />
 
-            <div style={{ fontSize: '12px', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#5115a4', margin: '20px 0 12px', paddingTop: '4px', borderTop: '1px solid #faf8f7' }}>Ориентиры конверсии</div>
+            <div style={{ fontSize: '12px', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--brand)', margin: '20px 0 12px', paddingTop: '4px', borderTop: '1px solid var(--surface-2)' }}>Ориентиры конверсии</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
               {convFields.map(cf => (
                 <label key={cf.label} style={{ display: 'block' }}>
-                  <span style={{ fontSize: '11.5px', fontWeight: 600, color: '#574d4f' }}>{cf.label}</span>
+                  <span style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--ink-2)' }}>{cf.label}</span>
                   <div style={{ position: 'relative', marginTop: '6px' }}>
                     <input
                       type="number"
                       value={cf.value}
                       onChange={e => cf.set(e.target.value)}
                       disabled={!isOwner}
-                      style={{ width: '100%', padding: '10px 36px 10px 12px', border: '1px solid #e8dfe0', borderRadius: '10px', fontSize: '15px', fontFamily: MONO, fontWeight: 500, background: isOwner ? '#fff' : '#fdfbfb', color: '#1b1517', boxSizing: 'border-box' }}
+                      style={{ width: '100%', padding: '10px 36px 10px 12px', border: '1px solid var(--line)', borderRadius: '10px', fontSize: '15px', fontFamily: MONO, fontWeight: 500, background: isOwner ? '#fff' : 'var(--surface-2)', color: 'var(--ink)', boxSizing: 'border-box' }}
                     />
-                    <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: '13px', color: '#7d7174', fontWeight: 600 }}>%</span>
+                    <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: '13px', color: 'var(--ink-3)', fontWeight: 600 }}>%</span>
                   </div>
                 </label>
               ))}
@@ -379,15 +379,15 @@ export default function DecompositionPage() {
           </section>
 
           {/* FUNNEL */}
-          <section style={{ background: '#ffffff', border: '1px solid #ece5e5', borderRadius: '24px', padding: '26px 30px 22px', boxShadow: '0 1px 2px rgba(28,20,22,0.04)', position: 'relative', overflow: 'hidden' }}>
+          <section style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: '24px', padding: '26px 30px 22px', boxShadow: '0 1px 2px rgba(28,20,22,0.04)', position: 'relative', overflow: 'hidden' }}>
             <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: '20px' }}>
               <div>
-                <h2 style={{ margin: 0, fontSize: '17px', fontWeight: 700, color: '#1b1517' }}>Расчётная воронка</h2>
-                <p style={{ margin: '4px 0 0', fontSize: '12.5px', color: '#574d4f' }}>Декомпозиция цели по выручке в необходимую активность — пересчёт мгновенно</p>
+                <h2 style={{ margin: 0, fontSize: '17px', fontWeight: 700, color: 'var(--ink)' }}>Расчётная воронка</h2>
+                <p style={{ margin: '4px 0 0', fontSize: '12.5px', color: 'var(--ink-2)' }}>Декомпозиция цели по выручке в необходимую активность — пересчёт мгновенно</p>
               </div>
               <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: '11px', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#7d7174', fontWeight: 600 }}>Нужно обращений</div>
-                <div style={{ fontFamily: MONO, fontSize: '26px', fontWeight: 600, color: '#5115a4' }}>{fmt(funnel.plan.obr)}</div>
+                <div style={{ fontSize: '11px', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--ink-3)', fontWeight: 600 }}>Нужно обращений</div>
+                <div style={{ fontFamily: MONO, fontSize: '26px', fontWeight: 600, color: 'var(--brand)' }}>{fmt(funnel.plan.obr)}</div>
               </div>
             </div>
 
@@ -395,13 +395,13 @@ export default function DecompositionPage() {
               {funnelStages.map(st => (
                 <div key={st.label} style={{ display: 'grid', gridTemplateColumns: '120px 1fr', alignItems: 'center', gap: '14px' }}>
                   <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: '13px', fontWeight: 600, color: '#f0eaea' }}>{st.label}</div>
-                    <div style={{ fontSize: '11px', color: '#7d7174' }}>{st.sub}</div>
+                    <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--surface-3)' }}>{st.label}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--ink-3)' }}>{st.sub}</div>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'center' }}>
                     <div style={{ width: barW(st.raw), minWidth: '120px', background: st.color, borderRadius: '8px', padding: '13px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', transition: 'width 0.35s cubic-bezier(.4,0,.2,1)' }}>
                       <span style={{ fontFamily: MONO, fontSize: '19px', fontWeight: 600, color: '#fff' }}>{fmt(st.val)}</span>
-                      <span style={{ fontSize: '11px', color: '#ffffff', fontWeight: 500 }}>{pctTop(st.raw)}</span>
+                      <span style={{ fontSize: '11px', color: 'var(--on-brand)', fontWeight: 500 }}>{pctTop(st.raw)}</span>
                     </div>
                   </div>
                 </div>
@@ -411,11 +411,11 @@ export default function DecompositionPage() {
               <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', alignItems: 'center', gap: '14px', marginTop: '6px' }}>
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ fontSize: '13px', fontWeight: 700, color: '#ffb3ba' }}>Выручка</div>
-                  <div style={{ fontSize: '11px', color: '#7d7174' }}>цель периода</div>
+                  <div style={{ fontSize: '11px', color: 'var(--ink-3)' }}>цель периода</div>
                 </div>
-                <div style={{ background: 'linear-gradient(90deg, #5115a4, #5115a4)', borderRadius: '8px', padding: '15px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: '1px solid #5115a4' }}>
+                <div style={{ background: 'linear-gradient(90deg, var(--brand), var(--brand))', borderRadius: '8px', padding: '15px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: '1px solid var(--brand)' }}>
                   <span style={{ fontFamily: MONO, fontSize: '22px', fontWeight: 600, color: '#fff' }}>{fmt(funnel.plan.rev)}</span>
-                  <span style={{ fontSize: '12px', color: '#ffffff', fontWeight: 500 }}>сом</span>
+                  <span style={{ fontSize: '12px', color: 'var(--on-brand)', fontWeight: 500 }}>сом</span>
                 </div>
               </div>
             </div>
@@ -425,7 +425,7 @@ export default function DecompositionPage() {
         {/* ===== PLAN VS FACT ===== */}
         <section style={{ ...cardStyle, marginTop: '24px' }}>
           <h2 style={{ margin: '0 0 18px', fontSize: '16px', fontWeight: 700 }}>План vs Факт</h2>
-          <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr 1fr 1fr 1.1fr', gap: 0, fontSize: '11px', letterSpacing: '0.06em', textTransform: 'uppercase', color: '#6b6063', fontWeight: 600, padding: '0 4px 10px', borderBottom: '1px solid #faf8f7' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr 1fr 1fr 1.1fr', gap: 0, fontSize: '11px', letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--ink-2)', fontWeight: 600, padding: '0 4px 10px', borderBottom: '1px solid var(--surface-2)' }}>
             <div>Этап</div>
             <div style={{ textAlign: 'right' }}>План</div>
             <div style={{ textAlign: 'right' }}>Факт</div>
@@ -433,14 +433,14 @@ export default function DecompositionPage() {
             <div style={{ textAlign: 'right' }}>% выполнения</div>
           </div>
           {planFactRows.map(r => (
-            <div key={r.name} style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr 1fr 1fr 1.1fr', gap: 0, alignItems: 'center', padding: '13px 4px', borderBottom: '1px solid #fdfbfb' }}>
-              <div style={{ fontSize: '14px', fontWeight: 600, color: '#1b1517' }}>{r.name}</div>
-              <div style={{ textAlign: 'right', fontFamily: MONO, fontSize: '14px', color: '#574d4f' }}>{r.planFmt}</div>
-              <div style={{ textAlign: 'right', fontFamily: MONO, fontSize: '14px', color: '#1b1517', fontWeight: 500 }}>{r.factFmt}</div>
+            <div key={r.name} style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr 1fr 1fr 1.1fr', gap: 0, alignItems: 'center', padding: '13px 4px', borderBottom: '1px solid var(--surface-2)' }}>
+              <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--ink)' }}>{r.name}</div>
+              <div style={{ textAlign: 'right', fontFamily: MONO, fontSize: '14px', color: 'var(--ink-2)' }}>{r.planFmt}</div>
+              <div style={{ textAlign: 'right', fontFamily: MONO, fontSize: '14px', color: 'var(--ink)', fontWeight: 500 }}>{r.factFmt}</div>
               <div style={{ textAlign: 'right', fontFamily: MONO, fontSize: '14px', fontWeight: 600, color: r.diffColor }}>{r.diffFmt}</div>
               <div style={{ textAlign: 'right' }}>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: '7px', justifyContent: 'flex-end' }}>
-                  <span style={{ width: '54px', height: '6px', borderRadius: '4px', background: '#faf8f7', overflow: 'hidden', display: 'inline-block', position: 'relative' }}>
+                  <span style={{ width: '54px', height: '6px', borderRadius: '4px', background: 'var(--surface-2)', overflow: 'hidden', display: 'inline-block', position: 'relative' }}>
                     <span style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: r.barWidth, background: r.barColor, borderRadius: '4px' }} />
                   </span>
                   <span style={{ fontFamily: MONO, fontSize: '14px', fontWeight: 600, color: r.pctColor, minWidth: '44px', textAlign: 'right' }}>{r.pctFmt}</span>
@@ -455,15 +455,15 @@ export default function DecompositionPage() {
 
           <section style={cardStyle}>
             <h2 style={{ margin: '0 0 4px', fontSize: '16px', fontWeight: 700 }}>Реальная конверсия</h2>
-            <p style={{ margin: '0 0 18px', fontSize: '12.5px', color: '#6b6063' }}>Факт по каждому переходу воронки рядом с ориентиром</p>
+            <p style={{ margin: '0 0 18px', fontSize: '12.5px', color: 'var(--ink-2)' }}>Факт по каждому переходу воронки рядом с ориентиром</p>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
               {realConv.map(c => (
-                <div key={c.name} style={{ border: '1px solid #faf8f7', borderRadius: '12px', padding: '15px 16px', background: c.tileBg }}>
-                  <div style={{ fontSize: '13px', fontWeight: 600, color: '#1b1517', marginBottom: '12px' }}>{c.name}</div>
+                <div key={c.name} style={{ border: '1px solid var(--surface-2)', borderRadius: '12px', padding: '15px 16px', background: c.tileBg }}>
+                  <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--ink)', marginBottom: '12px' }}>{c.name}</div>
                   <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
                     <div>
                       <div style={{ fontFamily: MONO, fontSize: '26px', fontWeight: 600, color: c.factColor, lineHeight: 1 }}>{c.factFmt}</div>
-                      <div style={{ fontSize: '11px', color: '#6b6063', marginTop: '5px' }}>ориентир {c.targetFmt}</div>
+                      <div style={{ fontSize: '11px', color: 'var(--ink-2)', marginTop: '5px' }}>ориентир {c.targetFmt}</div>
                     </div>
                     {c.devArrow && (
                       <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '13px', fontWeight: 700, color: c.devColor }}>
@@ -479,18 +479,18 @@ export default function DecompositionPage() {
           <section style={cardStyle}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '9px', marginBottom: '4px' }}>
               <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700 }}>Без НВ</h2>
-              <span style={{ fontSize: '11px', fontWeight: 600, color: '#5115a4', background: '#faf8f7', padding: '3px 9px', borderRadius: '999px' }}>только факт</span>
+              <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--brand)', background: 'var(--surface-2)', padding: '3px 9px', borderRadius: '999px' }}>только факт</span>
             </div>
-            <p style={{ margin: '0 0 18px', fontSize: '12.5px', color: '#6b6063' }}>Случайные клиенты — вне плановой воронки</p>
+            <p style={{ margin: '0 0 18px', fontSize: '12.5px', color: 'var(--ink-2)' }}>Случайные клиенты — вне плановой воронки</p>
 
-            <div style={{ border: '1px solid #faf8f7', borderRadius: '12px', padding: '16px 18px', marginBottom: '12px' }}>
-              <div style={{ fontSize: '12px', color: '#6b6063', fontWeight: 600 }}>Продажи без НВ</div>
-              <div style={{ fontFamily: MONO, fontSize: '28px', fontWeight: 600, color: '#1b1517', marginTop: '4px' }}>{fmt(fact.no_nv_sales)}</div>
+            <div style={{ border: '1px solid var(--surface-2)', borderRadius: '12px', padding: '16px 18px', marginBottom: '12px' }}>
+              <div style={{ fontSize: '12px', color: 'var(--ink-2)', fontWeight: 600 }}>Продажи без НВ</div>
+              <div style={{ fontFamily: MONO, fontSize: '28px', fontWeight: 600, color: 'var(--ink)', marginTop: '4px' }}>{fmt(fact.no_nv_sales)}</div>
             </div>
-            <div style={{ border: '1px solid #faf8f7', borderRadius: '12px', padding: '16px 18px', background: '#fdfbfb' }}>
-              <div style={{ fontSize: '12px', color: '#6b6063', fontWeight: 600 }}>Выручка без НВ</div>
-              <div style={{ fontFamily: MONO, fontSize: '28px', fontWeight: 600, color: '#5115a4', marginTop: '4px' }}>
-                {fmt(fact.no_nv_revenue)} <span style={{ fontSize: '14px', color: '#7d7174' }}>сом</span>
+            <div style={{ border: '1px solid var(--surface-2)', borderRadius: '12px', padding: '16px 18px', background: 'var(--surface-2)' }}>
+              <div style={{ fontSize: '12px', color: 'var(--ink-2)', fontWeight: 600 }}>Выручка без НВ</div>
+              <div style={{ fontFamily: MONO, fontSize: '28px', fontWeight: 600, color: 'var(--brand)', marginTop: '4px' }}>
+                {fmt(fact.no_nv_revenue)} <span style={{ fontSize: '14px', color: 'var(--ink-3)' }}>сом</span>
               </div>
             </div>
           </section>
@@ -501,25 +501,25 @@ export default function DecompositionPage() {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
             <div>
               <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700 }}>План / Факт по дням</h2>
-              <p style={{ margin: '4px 0 0', fontSize: '12.5px', color: '#6b6063' }}>Дневной план = план периода, разделённый поровну на календарные дни. Выручка — в сомах.</p>
+              <p style={{ margin: '4px 0 0', fontSize: '12.5px', color: 'var(--ink-2)' }}>Дневной план = план периода, разделённый поровну на календарные дни. Выручка — в сомах.</p>
             </div>
-            <span style={{ fontSize: '11px', fontWeight: 600, color: '#5115a4', background: '#faf8f7', padding: '4px 10px', borderRadius: '999px' }}>{nDays} дн.</span>
+            <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--brand)', background: 'var(--surface-2)', padding: '4px 10px', borderRadius: '999px' }}>{nDays} дн.</span>
           </div>
 
-          <div style={{ overflow: 'auto', maxHeight: '560px', border: '1px solid #faf8f7', borderRadius: '12px' }}>
+          <div style={{ overflow: 'auto', maxHeight: '560px', border: '1px solid var(--surface-2)', borderRadius: '12px' }}>
             <table style={{ borderCollapse: 'separate', borderSpacing: 0, width: '100%', minWidth: '1120px', fontSize: '11.5px', fontFamily: MONO }}>
               <thead>
                 <tr>
-                  <th rowSpan={2} style={{ position: 'sticky', left: 0, top: 0, zIndex: 4, background: '#f6f2f2', color: '#574d4f', textAlign: 'left', padding: '8px 10px', fontFamily: "'Golos Text', sans-serif", fontSize: '11px', letterSpacing: '0.04em', minWidth: '78px' }}>Дата</th>
+                  <th rowSpan={2} style={{ position: 'sticky', left: 0, top: 0, zIndex: 4, background: 'var(--surface-3)', color: 'var(--ink-2)', textAlign: 'left', padding: '8px 10px', fontFamily: "'Golos Text', sans-serif", fontSize: '11px', letterSpacing: '0.04em', minWidth: '78px' }}>Дата</th>
                   {['Обращения', 'Лиды', 'НВ', 'ФВ', 'Продажи'].map(h => (
-                    <th key={h} colSpan={3} style={{ position: 'sticky', top: 0, zIndex: 3, background: '#f6f2f2', color: '#574d4f', padding: '7px 8px', fontFamily: "'Golos Text', sans-serif", fontSize: '11px', borderLeft: '2px solid #ece5e5' }}>{h}</th>
+                    <th key={h} colSpan={3} style={{ position: 'sticky', top: 0, zIndex: 3, background: 'var(--surface-3)', color: 'var(--ink-2)', padding: '7px 8px', fontFamily: "'Golos Text', sans-serif", fontSize: '11px', borderLeft: '2px solid var(--line)' }}>{h}</th>
                   ))}
-                  <th colSpan={3} style={{ position: 'sticky', top: 0, zIndex: 3, background: '#5115a4', color: '#fff', padding: '7px 8px', fontFamily: "'Golos Text', sans-serif", fontSize: '11px', borderLeft: '2px solid #5115a4' }}>Выручка</th>
+                  <th colSpan={3} style={{ position: 'sticky', top: 0, zIndex: 3, background: 'var(--brand)', color: '#fff', padding: '7px 8px', fontFamily: "'Golos Text', sans-serif", fontSize: '11px', borderLeft: '2px solid var(--brand)' }}>Выручка</th>
                 </tr>
                 <tr>
                   {STAGE_KEYS.map(k => (
                     ['План', 'Факт', 'Разн.'].map((sub, j) => (
-                      <th key={`${k}-${sub}`} style={{ position: 'sticky', top: '32px', zIndex: 3, background: '#faf8f7', color: '#6b6063', fontFamily: "'Golos Text', sans-serif", fontWeight: 600, fontSize: '10px', padding: '5px 8px', textAlign: 'right', borderLeft: j === 0 ? '2px solid #ece5e5' : undefined }}>{sub}</th>
+                      <th key={`${k}-${sub}`} style={{ position: 'sticky', top: '32px', zIndex: 3, background: 'var(--surface-2)', color: 'var(--ink-2)', fontFamily: "'Golos Text', sans-serif", fontWeight: 600, fontSize: '10px', padding: '5px 8px', textAlign: 'right', borderLeft: j === 0 ? '2px solid var(--line)' : undefined }}>{sub}</th>
                     ))
                   ))}
                 </tr>
@@ -530,9 +530,9 @@ export default function DecompositionPage() {
                   const weekend = dt.getDay() === 0 || dt.getDay() === 6
                   return (
                     <tr key={d.date}>
-                      <td style={{ position: 'sticky', left: 0, zIndex: 2, background: weekend ? '#fdfbfb' : '#ffffff', padding: '5px 10px', borderBottom: '1px solid #fdfbfb', whiteSpace: 'nowrap', fontFamily: "'Golos Text', sans-serif" }}>
-                        <span style={{ fontWeight: 600, color: '#1b1517' }}>{String(dt.getDate()).padStart(2, '0')}.{String(dt.getMonth() + 1).padStart(2, '0')}</span>
-                        <span style={{ color: weekend ? '#a15a49' : '#6b6063', fontSize: '10px', marginLeft: '5px' }}>{DOW[dt.getDay()]}</span>
+                      <td style={{ position: 'sticky', left: 0, zIndex: 2, background: weekend ? 'var(--surface-2)' : 'var(--surface)', padding: '5px 10px', borderBottom: '1px solid var(--surface-2)', whiteSpace: 'nowrap', fontFamily: "'Golos Text', sans-serif" }}>
+                        <span style={{ fontWeight: 600, color: 'var(--ink)' }}>{String(dt.getDate()).padStart(2, '0')}.{String(dt.getMonth() + 1).padStart(2, '0')}</span>
+                        <span style={{ color: weekend ? '#a15a49' : 'var(--ink-2)', fontSize: '10px', marginLeft: '5px' }}>{DOW[dt.getDay()]}</span>
                       </td>
                       {STAGE_KEYS.map(k => {
                         const p = stagePlans[k][i] ?? 0
@@ -545,7 +545,7 @@ export default function DecompositionPage() {
               </tbody>
               <tfoot>
                 <tr>
-                  <td style={{ position: 'sticky', left: 0, bottom: 0, zIndex: 3, background: '#f6f2f2', color: '#574d4f', padding: '8px 10px', fontFamily: "'Golos Text', sans-serif", fontWeight: 700, fontSize: '12px' }}>Итого</td>
+                  <td style={{ position: 'sticky', left: 0, bottom: 0, zIndex: 3, background: 'var(--surface-3)', color: 'var(--ink-2)', padding: '8px 10px', fontFamily: "'Golos Text', sans-serif", fontWeight: 700, fontSize: '12px' }}>Итого</td>
                   {STAGE_KEYS.map(k => {
                     const p = stagePlans[k].reduce((a, b) => a + b, 0)
                     const f = dailyFact.reduce((a, d) => a + d[k], 0)
@@ -567,9 +567,9 @@ function DayCells({ p, f }: { p: number; f: number }) {
   const diff = f - p
   return (
     <>
-      <td style={{ padding: '5px 8px', textAlign: 'right', color: '#6b6063', borderBottom: '1px solid #fdfbfb', borderLeft: '2px solid #fdfbfb' }}>{fmt(p)}</td>
-      <td style={{ padding: '5px 8px', textAlign: 'right', color: '#1b1517', fontWeight: 500, borderBottom: '1px solid #fdfbfb' }}>{fmt(f)}</td>
-      <td style={{ padding: '5px 8px', textAlign: 'right', fontWeight: 600, color: diff >= 0 ? GREEN : RED, borderBottom: '1px solid #fdfbfb' }}>{(diff >= 0 ? '+' : '') + fmt(diff)}</td>
+      <td style={{ padding: '5px 8px', textAlign: 'right', color: 'var(--ink-2)', borderBottom: '1px solid var(--surface-2)', borderLeft: '2px solid var(--surface-2)' }}>{fmt(p)}</td>
+      <td style={{ padding: '5px 8px', textAlign: 'right', color: 'var(--ink)', fontWeight: 500, borderBottom: '1px solid var(--surface-2)' }}>{fmt(f)}</td>
+      <td style={{ padding: '5px 8px', textAlign: 'right', fontWeight: 600, color: diff >= 0 ? GREEN : RED, borderBottom: '1px solid var(--surface-2)' }}>{(diff >= 0 ? '+' : '') + fmt(diff)}</td>
     </>
   )
 }
@@ -578,9 +578,9 @@ function TotalCells({ p, f }: { p: number; f: number }) {
   const diff = f - p
   return (
     <>
-      <td style={{ position: 'sticky', bottom: 0, zIndex: 2, background: '#f6f2f2', color: '#6b6063', padding: '8px', textAlign: 'right', fontWeight: 600, borderLeft: '2px solid #ece5e5' }}>{fmt(p)}</td>
-      <td style={{ position: 'sticky', bottom: 0, zIndex: 2, background: '#f6f2f2', color: '#1b1517', padding: '8px', textAlign: 'right', fontWeight: 600 }}>{fmt(f)}</td>
-      <td style={{ position: 'sticky', bottom: 0, zIndex: 2, background: '#f6f2f2', padding: '8px', textAlign: 'right', fontWeight: 700, color: diff >= 0 ? '#15803d' : '#5115a4' }}>{(diff >= 0 ? '+' : '') + fmt(diff)}</td>
+      <td style={{ position: 'sticky', bottom: 0, zIndex: 2, background: 'var(--surface-3)', color: 'var(--ink-2)', padding: '8px', textAlign: 'right', fontWeight: 600, borderLeft: '2px solid var(--line)' }}>{fmt(p)}</td>
+      <td style={{ position: 'sticky', bottom: 0, zIndex: 2, background: 'var(--surface-3)', color: 'var(--ink)', padding: '8px', textAlign: 'right', fontWeight: 600 }}>{fmt(f)}</td>
+      <td style={{ position: 'sticky', bottom: 0, zIndex: 2, background: 'var(--surface-3)', padding: '8px', textAlign: 'right', fontWeight: 700, color: diff >= 0 ? 'var(--ok)' : 'var(--brand)' }}>{(diff >= 0 ? '+' : '') + fmt(diff)}</td>
     </>
   )
 }
