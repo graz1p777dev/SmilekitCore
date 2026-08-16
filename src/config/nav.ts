@@ -110,6 +110,12 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: FlaskConical,
         roles: ['owner'],
       },
+      {
+        href: '/dashboard/whatsapp-lab',
+        label: 'Лаборатория WhatsApp',
+        icon: FlaskConical,
+        roles: ['owner'],
+      },
     ],
   },
   {

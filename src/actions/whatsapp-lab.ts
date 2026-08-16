@@ -1,0 +1,79 @@
+'use server'
+
+// Песочница для теста WhatsApp-канала (Green API): в отличие от
+// /dashboard/laboratory (тестирует только AI-ядро менеджер+супервизор без
+// сценариев), здесь гоняется РЕАЛЬНЫЙ пайплайн bot-reply.ts — тот же самый
+// код, что обрабатывает настоящие сообщения клиентов: скрипт продаж, блок
+// результата с фото, доставка по городу, QR оплаты, свои правила из
+// настроек, follow-up-скидка. Отличия от прода — только opts:
+// skipIntegrationCheck (не завязано на общий аварийный выключатель бота —
+// можно тестировать, даже когда бот выключен для реальных клиентов) и
+// dryRun (ничего не уходит в реальный Green API и не создаёт сделки в
+// воронке — тестовый chat_id никогда не пересекается с настоящими номерами).
+
+import { randomUUID } from 'crypto'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { processInboundGreenApiMessage } from '@/lib/greenapi/bot-reply'
+
+export interface WhatsappLabMessage {
+  sender: 'client' | 'bot'
+  text: string
+  createdAt: string
+}
+
+function newLabChatId(): string {
+  // Префикс гарантирует, что тестовый чат никогда не совпадёт с реальным
+  // номером телефона (chat_id в проде — только цифры).
+  return `lab-${randomUUID().replace(/-/g, '').slice(0, 12)}`
+}
+
+async function loadHistory(chatId: string): Promise<WhatsappLabMessage[]> {
+  const supabase = createAdminClient()
+  const { data } = await supabase
+    .from('amocrm_messages')
+    .select('sender, text, created_at')
+    .eq('chat_id', chatId)
+    .order('created_at', { ascending: true })
+    .limit(200)
+  return (data ?? [])
+    .map((row) => row as { sender: string; text: string; created_at: string })
+    .filter((row) => row.sender === 'client' || row.sender === 'bot')
+    .map((row) => ({
+      sender: row.sender as 'client' | 'bot',
+      text: row.text,
+      createdAt: row.created_at,
+    }))
+}
+
+export type SendWhatsappLabMessageResult =
+  | { success: true; chatId: string; history: WhatsappLabMessage[] }
+  | { success: false; error: string }
+
+/** chatId — undefined на первом сообщении новой сессии, дальше приходит от клиента. */
+export async function sendWhatsappLabMessage(
+  chatId: string | undefined,
+  text: string
+): Promise<SendWhatsappLabMessageResult> {
+  const trimmed = text.trim()
+  if (!trimmed) return { success: false, error: 'Введите сообщение' }
+
+  const effectiveChatId = chatId || newLabChatId()
+  try {
+    await processInboundGreenApiMessage(
+      {
+        providerMessageId: `lab:${randomUUID()}`,
+        chatId: effectiveChatId,
+        authorName: 'Тест (Лаборатория)',
+        text: trimmed,
+        messageType: 'text',
+        mediaUrl: null,
+      },
+      { skipIntegrationCheck: true, dryRun: true }
+    )
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Ошибка бота' }
+  }
+
+  const history = await loadHistory(effectiveChatId)
+  return { success: true, chatId: effectiveChatId, history }
+}

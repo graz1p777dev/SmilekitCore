@@ -389,9 +389,23 @@ function isPhoneAllowedForBot(chatId: string): boolean {
   return allowed.length === 0 || allowed.includes(chatId.replace(/\D/g, ''))
 }
 
+/**
+ * skipIntegrationCheck — только для локальной «Лаборатории» (см.
+ * src/app/api/greenapi-lab/route.ts): даёт погонять ровно ту же логику
+ * бота на тестовом chat_id, не включая реальный аварийный выключатель
+ * (integrations.amoCRM), который молчит для настоящих клиентов.
+ * dryRun — не дёргать реальный Green API (тестовый chat_id всё равно не
+ * существует в WhatsApp), ответы читаются из уже записанных строк в БД.
+ */
+export interface GreenApiTestOptions {
+  skipIntegrationCheck?: boolean
+  dryRun?: boolean
+}
+
 export async function canSendGreenApiBotReply(
   supabase: ReturnType<typeof createAdminClient>,
-  chatId: string
+  chatId: string,
+  opts: GreenApiTestOptions = {}
 ): Promise<boolean> {
   if (!isPhoneAllowedForBot(chatId)) return false
   // Общий с amoCRM-каналом аварийный выключатель (integrations.amoCRM) —
@@ -401,12 +415,18 @@ export async function canSendGreenApiBotReply(
     isManagerControllingChat(supabase, chatId),
   ])
   if (integrationResult.error) return false
-  return Boolean((integrationResult.data as { is_active?: boolean } | null)?.is_active) && !managerControls
+  const integrationActive = opts.skipIntegrationCheck
+    ? true
+    : Boolean((integrationResult.data as { is_active?: boolean } | null)?.is_active)
+  return integrationActive && !managerControls
 }
 
-function enqueueInboundGreenApiMessage(input: InboundGreenApiMessage): Promise<void> {
+function enqueueInboundGreenApiMessage(
+  input: InboundGreenApiMessage,
+  opts: GreenApiTestOptions
+): Promise<void> {
   const prev = chatQueues.get(input.chatId) ?? Promise.resolve()
-  const run = prev.then(() => globalGreenApiProcessingLimit(() => processInboundGreenApiMessageNow(input)))
+  const run = prev.then(() => globalGreenApiProcessingLimit(() => processInboundGreenApiMessageNow(input, opts)))
   const chain = run.then(() => {}, () => {})
   chatQueues.set(input.chatId, chain)
   chain.then(() => {
@@ -415,8 +435,11 @@ function enqueueInboundGreenApiMessage(input: InboundGreenApiMessage): Promise<v
   return run
 }
 
-export function processInboundGreenApiMessage(input: InboundGreenApiMessage): Promise<void> {
-  return enqueueInboundGreenApiMessage(input)
+export function processInboundGreenApiMessage(
+  input: InboundGreenApiMessage,
+  opts: GreenApiTestOptions = {}
+): Promise<void> {
+  return enqueueInboundGreenApiMessage(input, opts)
 }
 
 /**
@@ -622,7 +645,10 @@ async function resolveGreenApiExternalKey(
   return greenApiKey
 }
 
-async function processInboundGreenApiMessageNow(input: InboundGreenApiMessage): Promise<void> {
+async function processInboundGreenApiMessageNow(
+  input: InboundGreenApiMessage,
+  opts: GreenApiTestOptions = {}
+): Promise<void> {
   const supabase = createAdminClient()
 
   const transcript = await transcribeGreenApiVoice(input)
@@ -661,9 +687,13 @@ async function processInboundGreenApiMessageNow(input: InboundGreenApiMessage): 
     .select('is_active')
     .eq('name', 'amoCRM')
     .maybeSingle()
-  const botEnabled = Boolean((integration as { is_active?: boolean } | null)?.is_active)
+  const botEnabled = opts.skipIntegrationCheck
+    ? true
+    : Boolean((integration as { is_active?: boolean } | null)?.is_active)
 
-  if (externalKey.startsWith('greenapi:')) {
+  // dryRun (Лаборатория) не должен плодить настоящие сделки в воронке —
+  // тестовый chat_id не должен быть виден менеджерам как реальный лид.
+  if (externalKey.startsWith('greenapi:') && !opts.dryRun) {
     await upsertDealFromInbound({
       externalKey,
       source: 'whatsapp',
@@ -686,7 +716,7 @@ async function processInboundGreenApiMessageNow(input: InboundGreenApiMessage): 
   const inboundAction = COMPLAINT.test(input.text) || COOPERATION.test(input.text)
     ? 'non_standard_request'
     : stageActionForInbound(input.text)
-  if (inboundAction) {
+  if (inboundAction && !opts.dryRun) {
     const advanced = await advanceDealFromBotAction(externalKey, inboundAction)
     if (!advanced.ok && advanced.error) {
       console.error('greenapi bot-reply: stage advance failed', inboundAction, advanced.error)
@@ -840,7 +870,7 @@ async function processInboundGreenApiMessageNow(input: InboundGreenApiMessage): 
   const mediaBaseUrl = process.env.SMILEKIT_BOT_API_URL?.replace(/\/$/, '')
 
   for (let index = 0; index < replies.length; index++) {
-    if (!(await canSendGreenApiBotReply(supabase, input.chatId))) return
+    if (!(await canSendGreenApiBotReply(supabase, input.chatId, opts))) return
     const text = replies[index]
     const botMessageId = `bot:${input.providerMessageId}:${index}`
     const { error: reserveError } = await supabase.from('amocrm_messages').upsert({
@@ -860,7 +890,11 @@ async function processInboundGreenApiMessageNow(input: InboundGreenApiMessage): 
       // при любой ошибке откатываемся на текст, чтобы клиент не остался без
       // ответа.
       const voiceName = text === T.firstUseEffect ? 'first_use_effect.ogg' : 'not_scam.ogg'
-      if (voiceReplies.has(text) && mediaBaseUrl) {
+      if (opts.dryRun) {
+        // Тестовый chat_id не существует в WhatsApp — реальный вызов Green
+        // API только тратил бы время и падал. Запись в amocrm_messages выше
+        // уже сделана, этого достаточно, чтобы «Лаборатория» увидела ответ.
+      } else if (voiceReplies.has(text) && mediaBaseUrl) {
         try {
           await sendGreenApiVoice(chatId, `${mediaBaseUrl}/media/voice/${voiceName}`, voiceName)
         } catch (error) {
@@ -887,7 +921,7 @@ async function processInboundGreenApiMessageNow(input: InboundGreenApiMessage): 
         sender: 'bot',
         text: '[QR оплаты]',
       }, { onConflict: 'amo_message_id', ignoreDuplicates: true })
-      if (!qrReserveError) {
+      if (!qrReserveError && !opts.dryRun) {
         try {
           await sendGreenApiFileByUrl({
             chatId,
@@ -917,11 +951,13 @@ async function processInboundGreenApiMessageNow(input: InboundGreenApiMessage): 
         sender: 'bot',
         text: RESULTS_INTRO,
       }, { onConflict: 'amo_message_id', ignoreDuplicates: true })
-      await sendGreenApiMessage(chatId, RESULTS_INTRO).catch((error) =>
-        console.error('greenapi bot-reply: results intro failed', error)
-      )
+      if (!opts.dryRun) {
+        await sendGreenApiMessage(chatId, RESULTS_INTRO).catch((error) =>
+          console.error('greenapi bot-reply: results intro failed', error)
+        )
+      }
       for (const [name, caption] of RESULT_PHOTOS) {
-        if (!(await canSendGreenApiBotReply(supabase, input.chatId))) return
+        if (!(await canSendGreenApiBotReply(supabase, input.chatId, opts))) return
         const photoMessageId = `bot:${input.providerMessageId}:result:${name}`
         const { error: photoReserveError } = await supabase.from('amocrm_messages').upsert({
           amo_message_id: `ga:${photoMessageId}`,
@@ -934,16 +970,18 @@ async function processInboundGreenApiMessageNow(input: InboundGreenApiMessage): 
           console.error('greenapi bot-reply: result photo reserve failed', photoReserveError.message)
           continue
         }
-        try {
-          await sendGreenApiFileByUrl({
-            chatId,
-            urlFile: `${mediaBaseUrl}/media/results/${name}`,
-            fileName: name,
-            caption: caption || undefined,
-          })
-        } catch (error) {
-          await supabase.from('amocrm_messages').delete().eq('amo_message_id', `ga:${photoMessageId}`)
-          console.error('greenapi bot-reply: result photo send failed', error)
+        if (!opts.dryRun) {
+          try {
+            await sendGreenApiFileByUrl({
+              chatId,
+              urlFile: `${mediaBaseUrl}/media/results/${name}`,
+              fileName: name,
+              caption: caption || undefined,
+            })
+          } catch (error) {
+            await supabase.from('amocrm_messages').delete().eq('amo_message_id', `ga:${photoMessageId}`)
+            console.error('greenapi bot-reply: result photo send failed', error)
+          }
         }
         await new Promise((resolve) => setTimeout(resolve, 700))
       }
@@ -965,7 +1003,7 @@ async function processInboundGreenApiMessageNow(input: InboundGreenApiMessage): 
     }, { onConflict: 'amo_message_id', ignoreDuplicates: true })
   }
 
-  if (stageAction) {
+  if (stageAction && !opts.dryRun) {
     const result = await advanceDealFromBotAction(externalKey, stageAction)
     if (!result.ok && result.error) {
       console.error('greenapi bot-reply: stage advance failed', stageAction, result.error)
