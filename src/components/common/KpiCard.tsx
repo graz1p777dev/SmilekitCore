@@ -26,7 +26,7 @@ export default function KpiCard({
     <div
       className="rounded-xl p-4 flex flex-col gap-3 glass card-hover"
       style={{
-        boxShadow: '0 8px 24px -12px rgba(28,20,22,0.10)',
+        boxShadow: '0 8px 24px -12px rgba(0,0,0,0.35)',
       }}
     >
       {/* Заголовок */}
@@ -35,7 +35,12 @@ export default function KpiCard({
           {label}
         </span>
         {icon && (
-          <span style={{ color: 'var(--ink-3)' }}>{icon}</span>
+          <span
+            className="flex items-center justify-center rounded-lg"
+            style={{ width: 24, height: 24, background: 'var(--brand-soft)', color: 'var(--brand-ink)' }}
+          >
+            {icon}
+          </span>
         )}
       </div>
 
@@ -67,7 +72,7 @@ export default function KpiCard({
           style={{
             height: 3,
             borderRadius: 2,
-            backgroundColor: 'rgba(28,20,22,0.08)',
+            backgroundColor: 'var(--surface-3)',
           }}
         >
           <div
@@ -76,6 +81,7 @@ export default function KpiCard({
               width: `${clampedPct}%`,
               backgroundColor: barColor,
               borderRadius: 2,
+              boxShadow: `0 0 8px 0 ${barColor}`,
               transition: 'width 0.4s ease',
             }}
           />

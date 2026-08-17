@@ -195,10 +195,15 @@ tbody tr { transition: background-color 150ms ease; }
   color: var(--ink-2) !important;
 }
 
-.card-hover { transition: transform 150ms ease, box-shadow 150ms ease; }
+.card-hover { transition: transform 150ms ease, box-shadow 150ms ease, border-color 150ms ease; }
 .card-hover:hover {
   transform: translateY(-1px);
   box-shadow: 0 10px 30px -12px rgba(54, 14, 127, 0.18);
+}
+/* Тёмная тема: свечение акцентом, как на витрине — карточка чуть
+   «подсвечивается» при наведении, а не просто тонет в тени. */
+.dark .card-hover:hover {
+  box-shadow: 0 12px 34px -14px var(--accent-shadow), 0 0 0 1px rgba(167, 139, 250, 0.18);
 }
 
 /* === Поверхности ===
