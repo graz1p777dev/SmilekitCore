@@ -12,7 +12,7 @@ interface Props {
 
 export default function FinanceHeader({ year, month, onPrev, onNext }: Props) {
   return (
-    <div className="flex items-center justify-between px-5 py-4 border-b" style={{ backgroundColor: '#fff', borderColor: 'var(--line)' }}>
+    <div className="flex items-center justify-between px-5 py-4 border-b" style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--line)' }}>
       <div className="flex items-center gap-3">
         <FinanceHeaderIcon />
         <div>

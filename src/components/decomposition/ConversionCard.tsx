@@ -18,7 +18,7 @@ export default function ConversionCard({ data }: Props) {
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
       {/* Реальная конверсия */}
-      <div className="rounded-2xl p-5 shadow-sm border" style={{ backgroundColor: '#fff', borderColor: 'var(--line)' }}>
+      <div className="rounded-2xl p-5 shadow-sm border" style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--line)' }}>
         <p className="text-sm font-semibold mb-4" style={{ color: 'var(--ink)' }}>Реальная конверсия</p>
         <div className="space-y-4">
           {data.rows.map(row => {
@@ -46,7 +46,7 @@ export default function ConversionCard({ data }: Props) {
       </div>
 
       {/* Ориентиры конверсии */}
-      <div className="rounded-2xl p-5 shadow-sm border" style={{ backgroundColor: '#fff', borderColor: 'var(--line)' }}>
+      <div className="rounded-2xl p-5 shadow-sm border" style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--line)' }}>
         <div className="flex items-center justify-between mb-4">
           <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>Ориентиры конверсии</p>
           <button className="flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-lg" style={{ color: 'var(--brand)', backgroundColor: 'var(--surface-2)' }}>

@@ -70,7 +70,7 @@ function ActionCard({ action, onDone }: { action: PendingAction; onDone: (msg: C
   }
 
   return (
-    <div className="rounded-2xl px-4 py-3.5 max-w-xs self-start" style={{ backgroundColor: '#fff', border: '1px solid var(--brand)' }}>
+    <div className="rounded-2xl px-4 py-3.5 max-w-xs self-start" style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--brand)' }}>
       <div className="text-xs font-bold mb-2" style={{ color: ink }}>
         {ACTION_TITLES[action.tool_name] || 'Подтвердите действие'}
       </div>
@@ -208,8 +208,8 @@ function HelpPageInner() {
           <div className="flex flex-col gap-2 w-full max-w-md">
             {EXAMPLES.map(ex => (
               <button key={ex} onClick={() => send(ex)}
-                className="rounded-xl px-3.5 py-2.5 text-sm text-left transition-colors"
-                style={{ backgroundColor: '#fff', border: '1px solid var(--border)', color: steel }}>
+                className="rounded-xl px-3.5 py-2.5 text-sm text-left transition-colors hover:border-[var(--brand)]"
+                style={{ backgroundColor: 'var(--surface-2)', border: '1px solid var(--border)', color: steel }}>
                 {ex}
               </button>
             ))}

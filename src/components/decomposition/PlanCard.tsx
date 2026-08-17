@@ -18,7 +18,7 @@ export default function PlanCard({ data, view }: Props) {
   const { year, month, daysInMonth, workDays, daysPassed, progressPct, status } = period
 
   return (
-    <div className="rounded-2xl overflow-hidden shadow-sm border" style={{ backgroundColor: '#fff', borderColor: 'var(--line)' }}>
+    <div className="rounded-2xl overflow-hidden shadow-sm border" style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--line)' }}>
       {/* Шапка */}
       <div className="px-6 py-4 flex items-center justify-between" style={{ background: 'linear-gradient(135deg, var(--brand) 0%, #ff7a2f 100%)' }}>
         <div className="flex items-center gap-3">

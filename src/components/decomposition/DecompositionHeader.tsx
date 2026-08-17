@@ -28,7 +28,7 @@ export default function DecompositionHeader({ year, month, view, onPrev, onNext,
           value={view}
           onChange={e => onViewChange(e.target.value as 'company' | 'employee')}
           className="h-9 px-3 rounded-xl text-sm font-medium focus:outline-none border"
-          style={{ backgroundColor: '#fff', borderColor: 'var(--line)', color: 'var(--ink)' }}
+          style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--line)', color: 'var(--ink)' }}
         >
           <option value="company">Общая декомпозиция</option>
           <option value="employee">Декомпозиция сотрудника</option>

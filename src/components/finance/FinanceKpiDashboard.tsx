@@ -21,7 +21,7 @@ function KpiCard({ m }: { m: Metric }) {
 
   return (
     <div className="rounded-2xl p-4 border flex flex-col gap-2.5"
-      style={{ backgroundColor: '#fff', borderColor: c.border, borderWidth: 1.5 }}
+      style={{ backgroundColor: 'var(--surface)', borderColor: c.border, borderWidth: 1.5 }}
     >
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-2">

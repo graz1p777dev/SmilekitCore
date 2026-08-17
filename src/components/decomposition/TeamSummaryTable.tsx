@@ -24,7 +24,7 @@ interface Props {
 
 export default function TeamSummaryTable({ rows, monthLabel }: Props) {
   return (
-    <div className="rounded-2xl shadow-sm border overflow-hidden" style={{ backgroundColor: '#fff', borderColor: 'var(--line)' }}>
+    <div className="rounded-2xl shadow-sm border overflow-hidden" style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--line)' }}>
       <div className="px-5 py-4 border-b" style={{ borderColor: 'var(--line)' }}>
         <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>Итоги команды</p>
         <p className="text-[11px] mt-0.5" style={{ color: 'var(--ink-3)' }}>{monthLabel}</p>

@@ -61,7 +61,7 @@ function KpiCard({ metric, fact, plan }: KpiCardProps) {
   return (
     <div
       className="rounded-2xl p-3.5 border flex flex-col gap-2"
-      style={{ backgroundColor: '#fff', borderColor: colors.border, borderWidth: 1.5 }}
+      style={{ backgroundColor: 'var(--surface)', borderColor: colors.border, borderWidth: 1.5 }}
     >
       {/* Шапка */}
       <div className="flex items-start justify-between gap-1">

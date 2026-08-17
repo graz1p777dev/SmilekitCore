@@ -20,7 +20,7 @@ export default function QuickKpiCard({ items }: Props) {
         <div
           key={kpi.label}
           className="rounded-2xl px-4 py-4 shadow-sm border flex flex-col justify-between"
-          style={{ backgroundColor: '#fff', borderColor: 'var(--line)', minHeight: 100 }}
+          style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--line)', minHeight: 100 }}
         >
           <div className="flex items-center justify-between mb-2">
             <p className="text-[11px] leading-tight font-medium" style={{ color: 'var(--ink-3)' }}>{kpi.label}</p>

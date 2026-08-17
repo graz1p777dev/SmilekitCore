@@ -224,7 +224,7 @@ export default function DealsBoard({ initialStages, initialDeals, employees, me,
           <p className="kicker">Воронка продаж</p>
           <h1 className="block-title">Сделки</h1>
           <span className="span-rule" aria-hidden />
-          <p className="mt-1.5 text-[13px] text-gray-400">
+          <p className="mt-1.5 text-[13px]" style={{ color: 'var(--ink-3)' }}>
             {me.role === 'owner' || me.role === 'rop'
               ? `Все сделки магазина · ${deals.length}`
               : `Ваши сделки · ${deals.length}`}
@@ -234,19 +234,21 @@ export default function DealsBoard({ initialStages, initialDeals, employees, me,
         <div className="flex flex-wrap items-center gap-2">
           <AmoBotToggle />
           <div className="relative">
-            <Search size={15} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+            <Search size={15} className="absolute left-2.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--ink-4)' }} />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Клиент, телефон, название…"
-              className="h-9 w-56 rounded-xl border border-gray-200 bg-card/80 pl-8 pr-3 text-[13px] outline-none transition-colors focus:border-gray-300"
+              className="h-9 w-56 rounded-xl border pl-8 pr-3 text-[13px] outline-none transition-colors focus:border-[var(--brand)]"
+              style={{ borderColor: 'var(--line)', background: 'var(--surface-2)', color: 'var(--ink)' }}
             />
           </div>
 
           <button
             onClick={() => sync(false)}
             disabled={syncing}
-            className="flex h-9 items-center gap-1.5 rounded-xl border border-gray-200 bg-card/80 px-3 text-[13px] font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:opacity-60"
+            className="flex h-9 items-center gap-1.5 rounded-xl border px-3 text-[13px] font-medium transition-colors hover:bg-[var(--surface-3)] disabled:opacity-60"
+            style={{ borderColor: 'var(--line)', background: 'var(--surface-2)', color: 'var(--ink-2)' }}
             title="Забрать новые диалоги с витрины"
           >
             <RefreshCw size={15} className={cn(syncing && 'animate-spin')} />
@@ -362,7 +364,8 @@ export default function DealsBoard({ initialStages, initialDeals, employees, me,
                 {list.length === 0 && !dragId && (
                   <button
                     onClick={() => openNew(stage.id)}
-                    className="w-full rounded-xl border border-dashed border-gray-200 py-6 text-center text-[12px] text-gray-400 transition-colors hover:border-gray-300 hover:text-gray-500"
+                    className="w-full rounded-xl border border-dashed py-6 text-center text-[12px] transition-colors hover:border-[var(--brand)]"
+                    style={{ borderColor: 'var(--line)', color: 'var(--ink-4)' }}
                   >
                     Пусто — добавить сделку
                   </button>

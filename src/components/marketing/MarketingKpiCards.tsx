@@ -100,7 +100,7 @@ export default function MarketingKpiCards({ kpi }: Props) {
         <div
           key={card.label}
           className="rounded-2xl px-4 py-4 shadow-sm border"
-          style={{ backgroundColor: '#fff', borderColor: 'var(--line)' }}
+          style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--line)' }}
         >
           <div className="flex items-start justify-between mb-2">
             <p className="text-[11px] font-medium leading-tight" style={{ color: 'var(--ink-3)' }}>

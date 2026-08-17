@@ -185,7 +185,7 @@ export default function MarketingDailyTable({ rows, kpi }: Props) {
   }, [rows, hideWeekends, hideFuture, search, sortCol, sortDir])
 
   return (
-    <div className="rounded-2xl shadow-sm border overflow-hidden" style={{ backgroundColor: '#fff', borderColor: 'var(--line)' }}>
+    <div className="rounded-2xl shadow-sm border overflow-hidden" style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--line)' }}>
 
       {/* Тулбар */}
       <div className="flex flex-wrap items-center gap-2 px-4 py-3 border-b" style={{ borderColor: 'var(--line)' }}>
@@ -217,7 +217,7 @@ export default function MarketingDailyTable({ rows, kpi }: Props) {
             {(['fact','vs_plan','delta'] as ViewMode[]).map(m => (
               <button key={m} onClick={() => setViewMode(m)}
                 className="text-[10px] font-semibold px-2.5 py-1.5"
-                style={{ backgroundColor: viewMode === m ? 'var(--brand)' : '#fff', color: viewMode === m ? '#fff' : 'var(--ink)' }}
+                style={{ backgroundColor: viewMode === m ? 'var(--brand)' : 'var(--surface-2)', color: viewMode === m ? 'var(--on-brand)' : 'var(--ink)' }}
               >
                 {m === 'fact' ? 'Факт' : m === 'vs_plan' ? 'vs План' : 'Δ Откл.'}
               </button>
@@ -278,7 +278,7 @@ export default function MarketingDailyTable({ rows, kpi }: Props) {
           <tbody>
             {filtered.map((row, idx) => {
               const dayOfWeek = DAY_ABBR[new Date(row.date).getDay()]
-              const rowBg = row.isToday ? 'var(--warn-soft)' : row.isWeekend ? 'var(--surface-2)' : idx % 2 === 0 ? '#fff' : 'var(--surface-2)'
+              const rowBg = row.isToday ? 'var(--warn-soft)' : row.isWeekend ? 'var(--surface-2)' : idx % 2 === 0 ? 'var(--surface)' : 'var(--surface-2)'
 
               return (
                 <tr key={row.day} style={{ backgroundColor: rowBg, opacity: row.isFuture ? 0.4 : 1 }}>

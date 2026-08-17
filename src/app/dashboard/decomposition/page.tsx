@@ -59,11 +59,11 @@ function distEven(total: number, n: number): number[] {
 // ─── Мелкие UI-хелперы ────────────────────────────────────────────────────────
 
 const cardStyle: React.CSSProperties = {
-  background: '#fff',
-  border: '1px solid rgba(28,23,25,0.08)',
+  background: 'var(--surface)',
+  border: '1px solid var(--line)',
   borderRadius: '16px',
   padding: '24px 26px',
-  boxShadow: '0 2px 14px rgba(28,23,25,0.05)',
+  boxShadow: '0 2px 14px rgba(0,0,0,0.18)',
 }
 
 function MoneyInput({ label, value, onChange, disabled, unit }: {
@@ -85,7 +85,7 @@ function MoneyInput({ label, value, onChange, disabled, unit }: {
           style={{
             width: '100%', padding: '11px 52px 11px 13px', border: '1px solid var(--line)',
             borderRadius: '10px', fontSize: '15px', fontFamily: MONO, fontWeight: 500,
-            background: disabled ? 'var(--surface-2)' : '#fff', color: 'var(--ink)', boxSizing: 'border-box',
+            background: disabled ? 'var(--surface-2)' : 'var(--surface)', color: 'var(--ink)', boxSizing: 'border-box',
           }}
         />
         <span style={{ position: 'absolute', right: '13px', top: '50%', transform: 'translateY(-50%)', fontSize: '12px', color: 'var(--ink-3)', fontWeight: 600 }}>{unit}</span>
@@ -251,7 +251,7 @@ export default function DecompositionPage() {
       devArrow:  dev === null ? '' : (above ? '▲' : '▼'),
       devColor:  above ? GREEN : RED,
       factColor: factConv === null ? 'var(--ink-2)' : (above ? 'var(--ink)' : RED),
-      tileBg:    factConv === null ? '#fff' : (above ? '#f4faf6' : '#fdf5f4'),
+      tileBg:    factConv === null ? 'var(--surface)' : (above ? 'var(--ok-soft)' : 'var(--bad-soft)'),
     }
   })
 
@@ -369,7 +369,7 @@ export default function DecompositionPage() {
                       value={cf.value}
                       onChange={e => cf.set(e.target.value)}
                       disabled={!isOwner}
-                      style={{ width: '100%', padding: '10px 36px 10px 12px', border: '1px solid var(--line)', borderRadius: '10px', fontSize: '15px', fontFamily: MONO, fontWeight: 500, background: isOwner ? '#fff' : 'var(--surface-2)', color: 'var(--ink)', boxSizing: 'border-box' }}
+                      style={{ width: '100%', padding: '10px 36px 10px 12px', border: '1px solid var(--line)', borderRadius: '10px', fontSize: '15px', fontFamily: MONO, fontWeight: 500, background: isOwner ? 'var(--surface)' : 'var(--surface-2)', color: 'var(--ink)', boxSizing: 'border-box' }}
                     />
                     <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: '13px', color: 'var(--ink-3)', fontWeight: 600 }}>%</span>
                   </div>

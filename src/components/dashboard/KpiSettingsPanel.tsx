@@ -57,7 +57,7 @@ function toLocalItems(items: KpiItem[]): LocalKpiItem[] {
 // ─── Вспомогательные стили ────────────────────────────────────────────────────
 
 const card: React.CSSProperties = {
-  background: '#fff',
+  background: 'var(--surface)',
   border: '1px solid var(--line)',
   borderRadius: '12px',
   overflow: 'hidden',
@@ -514,7 +514,7 @@ export function KpiSettingsPanel() {
             type="number"
             value={workDaysStr}
             onChange={e => setWorkDaysStr(e.target.value)}
-            style={{ width: '44px', border: '1px solid var(--line)', borderRadius: '6px', padding: '4px 5px', fontFamily: "'IBM Plex Mono', monospace", fontSize: '13px', fontWeight: 600, color: 'var(--ink)', textAlign: 'center', background: '#fff' }}
+            style={{ width: '44px', border: '1px solid var(--line)', borderRadius: '6px', padding: '4px 5px', fontFamily: "'IBM Plex Mono', monospace", fontSize: '13px', fontWeight: 600, color: 'var(--ink)', textAlign: 'center', background: 'var(--surface-2)' }}
           />
         </div>
       </div>

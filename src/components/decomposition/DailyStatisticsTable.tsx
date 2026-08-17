@@ -51,7 +51,7 @@ interface Props {
 
 export default function DailyStatisticsTable({ rows }: Props) {
   return (
-    <div className="rounded-2xl shadow-sm border overflow-hidden" style={{ backgroundColor: '#fff', borderColor: 'var(--line)' }}>
+    <div className="rounded-2xl shadow-sm border overflow-hidden" style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--line)' }}>
       <div className="px-5 py-4 border-b" style={{ borderColor: 'var(--line)' }}>
         <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>Ежедневная статистика</p>
         <p className="text-[11px] mt-0.5" style={{ color: 'var(--ink-3)' }}>Данные за каждый день месяца</p>
@@ -95,7 +95,7 @@ export default function DailyStatisticsTable({ rows }: Props) {
 
           <tbody>
             {rows.map((row, ri) => {
-              const rowBg = row.isToday ? 'var(--surface-2)' : row.isWeekend ? '#fafafa' : '#fff'
+              const rowBg = row.isToday ? 'var(--warn-soft)' : row.isWeekend ? 'var(--surface-2)' : 'var(--surface)'
               return (
                 <tr key={ri} style={{ backgroundColor: rowBg, opacity: row.isFuture ? 0.4 : 1, borderBottom: '1px solid #f0f0f0' }}>
                   <td className="sticky left-0 z-10 px-4 py-2 whitespace-nowrap" style={{ backgroundColor: rowBg, borderRight: '2px solid var(--line)', minWidth: 80 }}>

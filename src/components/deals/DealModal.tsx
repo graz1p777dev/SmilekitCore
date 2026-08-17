@@ -277,9 +277,9 @@ export default function DealModal({
     <Modal onClose={onClose} variant="right">
       <div className="flex h-[100dvh] w-[min(760px,100vw)] flex-col overflow-hidden bg-card shadow-2xl animate-in slide-in-from-right duration-200">
         {/* Шапка */}
-        <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
+        <div className="flex items-center justify-between border-b px-6 py-4" style={{ borderColor: 'var(--line)' }}>
           <div className="flex items-center gap-2.5">
-            <h2 className="text-base font-bold text-gray-900">
+            <h2 className="text-base font-bold" style={{ color: 'var(--ink)' }}>
               {isNew ? 'Новая сделка' : 'Сделка'}
             </h2>
             {!isNew && (
@@ -294,7 +294,8 @@ export default function DealModal({
           </div>
           <button
             onClick={onClose}
-            className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+            className="rounded-lg p-1.5 transition-colors hover:bg-[var(--surface-3)]"
+            style={{ color: 'var(--ink-3)' }}
           >
             <X size={18} />
           </button>
@@ -470,7 +471,7 @@ export default function DealModal({
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
-                  <MessagesSquare size={14} className="text-gray-400" />
+                  <MessagesSquare size={14} style={{ color: 'var(--ink-4)' }} />
                   <Label>Переписка</Label>
                 </div>
                 {/* Тумблер появляется только когда в чате уже есть сообщение
@@ -487,11 +488,14 @@ export default function DealModal({
                         : 'Сейчас отвечает бот — нажмите, чтобы забрать чат себе'
                     }
                     className={cn(
-                      'flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors disabled:opacity-60',
-                      botControl.managerControls
-                        ? 'bg-amber-50 text-amber-700 hover:bg-amber-100'
-                        : 'bg-[var(--brand-soft)] text-[var(--brand)] hover:bg-[#e7dcf6]'
+                      'flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors hover:opacity-90 disabled:opacity-60',
+                      !botControl.managerControls && 'bg-[var(--brand-soft)] text-[var(--brand)] hover:bg-[#e7dcf6]'
                     )}
+                    style={
+                      botControl.managerControls
+                        ? { background: 'var(--warn-soft)', color: 'var(--warn)' }
+                        : undefined
+                    }
                   >
                     {botControl.managerControls ? <UserRound size={12} /> : <Bot size={12} />}
                     {botControl.managerControls ? 'Ведёте вы — вернуть боту' : 'Ведёт бот — забрать себе'}
@@ -499,9 +503,12 @@ export default function DealModal({
                 )}
               </div>
               {messages === null ? (
-                <p className="text-[12px] text-gray-400">Загружаем диалог…</p>
+                <p className="text-[12px]" style={{ color: 'var(--ink-4)' }}>Загружаем диалог…</p>
               ) : messages.length === 0 ? (
-                <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-gray-200 px-4 py-5 text-center text-[12px] text-gray-400">
+                <div
+                  className="flex flex-col items-center gap-2 rounded-xl border border-dashed px-4 py-5 text-center text-[12px]"
+                  style={{ borderColor: 'var(--line)', color: 'var(--ink-4)' }}
+                >
                   <span>{chatNote ?? 'Переписки нет'}</span>
                   {chatNote?.includes('Повторить') && (
                     <button
@@ -519,16 +526,15 @@ export default function DealModal({
                   )}
                 </div>
               ) : (
-                <div className="max-h-[42vh] space-y-1.5 overflow-y-auto rounded-xl bg-gray-50/70 p-3 scroll-hidden">
+                <div className="max-h-[42vh] space-y-1.5 overflow-y-auto rounded-xl p-3 scroll-hidden" style={{ background: 'var(--surface-2)' }}>
                   {messages.map((m) => (
                     <div
                       key={m.id}
                       className={cn(
                         'max-w-[85%] rounded-xl px-3 py-1.5 text-[12px] leading-snug whitespace-pre-wrap',
-                        m.direction === 'in'
-                          ? 'bg-card text-gray-700 shadow-sm'
-                          : 'ml-auto text-white brand-gradient'
+                        m.direction === 'in' ? 'shadow-sm' : 'ml-auto text-white brand-gradient'
                       )}
+                      style={m.direction === 'in' ? { background: 'var(--surface)', color: 'var(--ink-2)' } : undefined}
                     >
                       {m.direction === 'out' && (m.sender === 'bot' || m.sender === 'operator') && (
                         <span className="mb-0.5 block text-[10px] font-semibold opacity-80">
@@ -565,12 +571,13 @@ export default function DealModal({
         </div>
 
         {/* Низ */}
-        <div className="flex items-center justify-between gap-3 border-t border-gray-100 px-6 py-4">
+        <div className="flex items-center justify-between gap-3 border-t px-6 py-4" style={{ borderColor: 'var(--line)' }}>
           {!isNew && me.role === 'owner' ? (
             <button
               onClick={handleDelete}
               disabled={isPending}
-              className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[13px] text-gray-400 transition-colors hover:bg-[var(--brand-soft)] hover:text-[var(--brand)] disabled:opacity-50"
+              className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[13px] transition-colors hover:bg-[var(--brand-soft)] hover:text-[var(--brand)] disabled:opacity-50"
+              style={{ color: 'var(--ink-4)' }}
             >
               <Trash2 size={15} />
               Удалить
