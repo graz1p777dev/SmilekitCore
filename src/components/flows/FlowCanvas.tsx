@@ -23,14 +23,23 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { toast } from 'sonner'
-import { Bell, Bot, Clock, GitBranch, Image, MessageSquare, Plus, Save, Send, Trash2, Webhook, Zap } from 'lucide-react'
+import { Bell, Bot, Clock, Copy, FileText, GitBranch, Image, MessageSquare, Plus, Save, Send, Shuffle, Trash2, Variable, Webhook, Zap } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import PageHeader from '@/components/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { deleteFlowRule, matchFlowRules, saveFlowRule } from '@/actions/flows'
-import type { FlowAction, FlowActionType, FlowCondition, FlowRule } from '@/core'
+import {
+  deleteFlowRule,
+  deleteFlowTemplate,
+  deleteFlowVariable,
+  matchFlowRules,
+  saveFlowRule,
+  saveFlowTemplate,
+  saveFlowVariable,
+} from '@/actions/flows'
+import type { FlowAction, FlowActionType, FlowCondition, FlowRule, FlowTemplate, FlowVariable } from '@/core'
 
 // ─── Словарь для интерфейса ──────────────────────────────────────────────
 
@@ -51,6 +60,7 @@ const OP_LABELS: Record<FlowCondition['op'], string> = {
 
 const ACTION_LABELS: Record<FlowActionType, string> = {
   reply: 'Ответить текстом',
+  template: 'Отправить шаблон',
   media: 'Отправить файл',
   wait: 'Подождать',
   ai_reply: 'Ответ модели',
@@ -61,6 +71,7 @@ const ACTION_LABELS: Record<FlowActionType, string> = {
 
 const ACTION_ICONS: Record<FlowActionType, typeof MessageSquare> = {
   reply: MessageSquare,
+  template: FileText,
   media: Image,
   wait: Clock,
   ai_reply: Bot,
@@ -81,6 +92,8 @@ function emptyAction(type: FlowActionType): FlowAction {
   switch (type) {
     case 'reply':
       return { type: 'reply', text: '' }
+    case 'template':
+      return { type: 'template', templateId: '' }
     case 'media':
       return { type: 'media', url: '', fileName: 'file.jpg' }
     case 'wait':
@@ -96,10 +109,12 @@ function emptyAction(type: FlowActionType): FlowAction {
   }
 }
 
-function actionSummary(action: FlowAction): string {
+function actionSummary(action: FlowAction, templateNames: Map<string, string>): string {
   switch (action.type) {
     case 'reply':
       return action.text || 'текст не задан'
+    case 'template':
+      return templateNames.get(action.templateId) ?? 'шаблон не выбран'
     case 'media':
       return action.fileName || action.url || 'файл не задан'
     case 'wait':
@@ -169,17 +184,42 @@ function FlowNode({ data, selected }: NodeProps) {
 
 const nodeTypes = { flow: FlowNode }
 
+const VIEWS: [View, string, typeof MessageSquare][] = [
+  ['canvas', 'Канва', Shuffle],
+  ['templates', 'Шаблоны', FileText],
+  ['variables', 'Переменные', Variable],
+]
+
 const COLUMN_WIDTH = 260
 const ROW_HEIGHT = 110
 
 // ─── Страница ────────────────────────────────────────────────────────────
 
-export default function FlowCanvas({ initial }: { initial: FlowRule[] }) {
+type View = 'canvas' | 'templates' | 'variables'
+
+export default function FlowCanvas({
+  initial,
+  initialTemplates,
+  initialVariables,
+}: {
+  initial: FlowRule[]
+  initialTemplates: FlowTemplate[]
+  initialVariables: FlowVariable[]
+}) {
   const [rules, setRules] = useState<FlowRule[]>(initial)
+  const [templates, setTemplates] = useState<FlowTemplate[]>(initialTemplates)
+  const [variables, setVariables] = useState<FlowVariable[]>(initialVariables)
+  const [view, setView] = useState<View>('canvas')
   const [selected, setSelected] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
   const [dirty, setDirty] = useState<Set<string>>(new Set())
   const [probe, setProbe] = useState('')
+
+  // Узлы канвы показывают название шаблона, а не его id.
+  const templateNames = useMemo(
+    () => new Map(templates.map((item) => [item.id, item.name])),
+    [templates]
+  )
 
   const markDirty = useCallback((id: string) => {
     setDirty((current) => new Set(current).add(id))
@@ -200,8 +240,8 @@ export default function FlowCanvas({ initial }: { initial: FlowRule[] }) {
         type: 'flow',
         position: { x: 0, y: 0 },
         data: {
-          label: 'Клиент написал',
-          sub: 'Входящее сообщение в WhatsApp',
+          label: 'Входящее сообщение',
+          sub: 'Клиент написал в WhatsApp',
           tone: 'trigger',
           icon: Send,
         } satisfies NodeData,
@@ -235,7 +275,7 @@ export default function FlowCanvas({ initial }: { initial: FlowRule[] }) {
           position: rule.layout?.[id] ?? { x, y: ROW_HEIGHT * (index + 2) },
           data: {
             label: ACTION_LABELS[action.type],
-            sub: actionSummary(action),
+            sub: actionSummary(action, templateNames),
             tone: 'action',
             disabled: !rule.enabled,
             icon: ACTION_ICONS[action.type],
@@ -250,7 +290,7 @@ export default function FlowCanvas({ initial }: { initial: FlowRule[] }) {
     })
 
     return { nodes, edges }
-  }, [rules])
+  }, [rules, templateNames])
 
   function addRule() {
     startTransition(async () => {
@@ -263,6 +303,7 @@ export default function FlowCanvas({ initial }: { initial: FlowRule[] }) {
         conditions: [{ field: 'text', op: 'contains', value: '' }],
         actions: [{ type: 'reply', text: '' }],
         stopAfter: true,
+        dedupe: { mode: 'off' },
         layout: {},
       }
       const result = await saveFlowRule(draft)
@@ -305,12 +346,15 @@ export default function FlowCanvas({ initial }: { initial: FlowRule[] }) {
 
   function runProbe() {
     startTransition(async () => {
-      const result = await matchFlowRules(probe)
-      if (!result.success) {
-        toast.error(result.error)
+      const outcome = await matchFlowRules(probe)
+      if (!outcome.success) {
+        toast.error(outcome.error)
         return
       }
-      toast.success(result.ruleName ? `Сработает: «${result.ruleName}»` : 'Ни одна ветка не совпала — ответит скрипт продаж')
+      // Совпадения нет — это не ошибка, но и не успех: показываем нейтрально,
+      // чтобы «ничего не сработало» не выглядело как «всё хорошо».
+      if (outcome.result.ruleId) toast.success(outcome.result.explanation)
+      else toast.info(outcome.result.explanation)
     })
   }
 
@@ -328,17 +372,48 @@ export default function FlowCanvas({ initial }: { initial: FlowRule[] }) {
         subtitle="Если клиент написал — ответить, подождать, сделать. Собирается мышкой, применяется сразу"
         action={
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={addRule} disabled={pending}>
-              <Plus size={14} /> Новая ветка
-            </Button>
-            <Button size="sm" onClick={saveAll} disabled={pending || dirty.size === 0}>
-              <Save size={14} /> Сохранить{dirty.size ? ` (${dirty.size})` : ''}
-            </Button>
+            <div
+              className="flex items-center gap-0.5 rounded-xl p-0.5"
+              style={{ background: 'var(--surface-2)', border: '1px solid var(--line)' }}
+            >
+              {VIEWS.map(([id, label, Icon]) => (
+                <button
+                  key={id}
+                  onClick={() => setView(id)}
+                  className="flex items-center gap-1.5 rounded-[10px] px-2.5 py-1.5 text-[12px] font-medium transition-colors"
+                  style={
+                    view === id
+                      ? { background: 'var(--brand)', color: 'var(--on-brand)' }
+                      : { color: 'var(--ink-3)' }
+                  }
+                >
+                  <Icon size={13} /> {label}
+                </button>
+              ))}
+            </div>
+            {view === 'canvas' && (
+              <>
+                <Button variant="outline" size="sm" onClick={addRule} disabled={pending}>
+                  <Plus size={14} /> Новая ветка
+                </Button>
+                <Button size="sm" onClick={saveAll} disabled={pending || dirty.size === 0}>
+                  <Save size={14} /> Сохранить{dirty.size ? ` (${dirty.size})` : ''}
+                </Button>
+              </>
+            )}
           </div>
         }
       />
 
-      <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+      {view === 'templates' && (
+        <TemplatesManager templates={templates} onChange={setTemplates} pending={pending} run={startTransition} />
+      )}
+
+      {view === 'variables' && (
+        <VariablesManager variables={variables} onChange={setVariables} pending={pending} run={startTransition} />
+      )}
+
+      <div className={cn('flex min-h-0 flex-1 flex-col lg:flex-row', view !== 'canvas' && 'hidden')}>
         <div className="h-[420px] min-w-0 flex-1 lg:h-auto" style={{ background: 'color-mix(in srgb, var(--paper) 55%, transparent)' }}>
           <ReactFlow
             nodes={nodes}
@@ -415,6 +490,8 @@ export default function FlowCanvas({ initial }: { initial: FlowRule[] }) {
             <ActionEditor
               rule={selectedRule}
               index={selectedActionIndex}
+              templates={templates}
+              variables={variables}
               onChange={(actions) => updateRule(selectedRule.id, { actions })}
               onSelect={setSelected}
             />
@@ -469,6 +546,47 @@ function RuleEditor({
           />
           не продолжать скрипт продаж
         </label>
+      </div>
+
+      {/* Защита от дублей */}
+      <div>
+        <p className="flex items-center gap-1.5 text-xs font-bold" style={{ color: 'var(--ink)' }}>
+          <Copy size={13} /> Защита от дублей
+        </p>
+        <p className="mt-1 text-[11px] leading-snug" style={{ color: 'var(--ink-3)' }}>
+          Сколько раз ветка вправе сработать в одном чате. Клиент, написавший «сколько стоит» трижды,
+          не получит три одинаковых ответа.
+        </p>
+        <select
+          value={rule.dedupe?.mode ?? 'off'}
+          onChange={(event) =>
+            onChange({
+              dedupe: {
+                mode: event.target.value as FlowRule['dedupe']['mode'],
+                minutes: rule.dedupe?.minutes ?? 60,
+              },
+            })
+          }
+          className={selectClass}
+        >
+          <option value="off">Без ограничений</option>
+          <option value="once_per_chat">Один раз на чат</option>
+          <option value="cooldown">Не чаще, чем раз в…</option>
+        </select>
+        {rule.dedupe?.mode === 'cooldown' && (
+          <div className="mt-2">
+            <Label className="text-xs">Пауза между срабатываниями, минут</Label>
+            <Input
+              type="number"
+              min={1}
+              value={rule.dedupe.minutes ?? 60}
+              onChange={(event) =>
+                onChange({ dedupe: { mode: 'cooldown', minutes: Number(event.target.value) } })
+              }
+              className="mt-1 text-xs"
+            />
+          </div>
+        )}
       </div>
 
       <div>
@@ -559,11 +677,15 @@ function RuleEditor({
 function ActionEditor({
   rule,
   index,
+  templates,
+  variables,
   onChange,
   onSelect,
 }: {
   rule: FlowRule
   index: number
+  templates: FlowTemplate[]
+  variables: FlowVariable[]
   onChange: (actions: FlowAction[]) => void
   onSelect: (id: string | null) => void
 }) {
@@ -604,9 +726,38 @@ function ActionEditor({
             onChange={(event) => patch({ text: event.target.value })}
             className="mt-1 min-h-28 text-xs"
           />
-          <p className="mt-1 text-[11px]" style={{ color: 'var(--ink-3)' }}>
-            Подстановки: {'{{name}}'} — имя клиента, {'{{phone}}'} — номер, {'{{text}}'} — что он написал
-          </p>
+          <VariableHint variables={variables} />
+        </div>
+      )}
+
+      {action.type === 'template' && (
+        <div>
+          <Label className="text-xs">Шаблон</Label>
+          <select
+            value={action.templateId}
+            onChange={(event) => patch({ templateId: event.target.value })}
+            className={selectClass}
+          >
+            <option value="">— выберите шаблон —</option>
+            {templates.map((template) => (
+              <option key={template.id} value={template.id}>
+                {template.name}
+              </option>
+            ))}
+          </select>
+          {templates.length === 0 && (
+            <p className="mt-2 text-[11px]" style={{ color: 'var(--warn)' }}>
+              Шаблонов пока нет — создайте их во вкладке «Шаблоны».
+            </p>
+          )}
+          {action.templateId && (
+            <p
+              className="mt-2 whitespace-pre-wrap rounded-xl p-2.5 text-[11px] leading-snug"
+              style={{ background: 'var(--surface-2)', color: 'var(--ink-2)' }}
+            >
+              {templates.find((item) => item.id === action.templateId)?.text ?? 'Шаблон удалён'}
+            </p>
+          )}
         </div>
       )}
 
@@ -730,5 +881,330 @@ function ActionEditor({
         </Button>
       </div>
     </div>
+  )
+}
+
+// ─── Шаблоны и переменные ───────────────────────────────────────────────────
+
+const VARIABLE_SOURCES: [FlowVariable['source'], string, string][] = [
+  ['static', 'Фиксированный текст', 'всегда одно и то же значение'],
+  ['date', 'Дата', 'сегодняшняя дата: 17 августа'],
+  ['time', 'Время', 'текущее время: 14:30'],
+  ['datetime', 'Дата и время', '17 августа, 14:30'],
+  ['client_name', 'Имя клиента', 'как он подписан в WhatsApp'],
+  ['client_phone', 'Телефон клиента', 'номер, с которого пишет'],
+  ['message', 'Сообщение клиента', 'текст, на который отвечаем'],
+  ['ai', 'ИИ по промпту', 'модель заполняет значение сама'],
+]
+
+/** Подсказка со списком доступных подстановок — чтобы не держать их в голове. */
+function VariableHint({ variables }: { variables: FlowVariable[] }) {
+  return (
+    <p className="mt-1 text-[11px] leading-relaxed" style={{ color: 'var(--ink-3)' }}>
+      Подстановки: <code>{'{{name}}'}</code> — имя клиента, <code>{'{{phone}}'}</code> — номер,{' '}
+      <code>{'{{text}}'}</code> — что он написал
+      {variables.length > 0 && (
+        <>
+          {'. Свои: '}
+          {variables.map((variable, index) => (
+            <span key={variable.id}>
+              {index > 0 && ', '}
+              <code style={{ color: 'var(--brand-ink)' }}>{`{{${variable.name}}}`}</code>
+            </span>
+          ))}
+        </>
+      )}
+    </p>
+  )
+}
+
+function TemplatesManager({
+  templates,
+  onChange,
+  pending,
+  run,
+}: {
+  templates: FlowTemplate[]
+  onChange: (next: FlowTemplate[]) => void
+  pending: boolean
+  run: (fn: () => void) => void
+}) {
+  const [draft, setDraft] = useState({ name: '', text: '' })
+
+  function save(input: { id?: string; name: string; text: string }) {
+    run(async () => {
+      const result = await saveFlowTemplate(input)
+      if (!result.success) {
+        toast.error(result.error)
+        return
+      }
+      toast.success('Шаблон сохранён')
+      const id = result.id as string
+      onChange(
+        input.id
+          ? templates.map((item) => (item.id === input.id ? { ...item, ...input } : item))
+          : [...templates, { id, name: input.name, text: input.text }]
+      )
+      if (!input.id) setDraft({ name: '', text: '' })
+    })
+  }
+
+  function drop(id: string) {
+    run(async () => {
+      const result = await deleteFlowTemplate(id)
+      if (!result.success) {
+        toast.error(result.error)
+        return
+      }
+      toast.success('Шаблон удалён')
+      onChange(templates.filter((item) => item.id !== id))
+    })
+  }
+
+  return (
+    <main className="mx-auto w-full max-w-3xl flex-1 space-y-4 overflow-y-auto p-4 md:p-8">
+      <p className="text-xs leading-relaxed" style={{ color: 'var(--ink-3)' }}>
+        Готовые тексты, на которые ссылаются ветки. Поправили формулировку здесь — она поменялась везде,
+        где шаблон подставлен.
+      </p>
+
+      {templates.map((template) => (
+        <TemplateRow key={template.id} template={template} onSave={save} onDelete={drop} pending={pending} />
+      ))}
+
+      <section
+        className="rounded-3xl p-5"
+        style={{ background: 'var(--surface)', border: '1px solid var(--line)' }}
+      >
+        <p className="text-sm font-bold" style={{ color: 'var(--ink)' }}>
+          Новый шаблон
+        </p>
+        <div className="mt-3 space-y-2">
+          <Input
+            value={draft.name}
+            placeholder="Название: «Приветствие», «Условия доставки»"
+            onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))}
+            className="text-xs"
+          />
+          <Textarea
+            value={draft.text}
+            placeholder="Текст, который получит клиент. Можно с подстановками: Здравствуйте, {{name}}!"
+            onChange={(event) => setDraft((current) => ({ ...current, text: event.target.value }))}
+            className="min-h-24 text-xs"
+          />
+          <Button
+            size="sm"
+            disabled={pending || !draft.name.trim() || !draft.text.trim()}
+            onClick={() => save({ name: draft.name, text: draft.text })}
+          >
+            <Plus size={14} /> Добавить шаблон
+          </Button>
+        </div>
+      </section>
+    </main>
+  )
+}
+
+function TemplateRow({
+  template,
+  onSave,
+  onDelete,
+  pending,
+}: {
+  template: FlowTemplate
+  onSave: (input: { id: string; name: string; text: string }) => void
+  onDelete: (id: string) => void
+  pending: boolean
+}) {
+  const [name, setName] = useState(template.name)
+  const [text, setText] = useState(template.text)
+  const changed = name !== template.name || text !== template.text
+
+  return (
+    <section
+      className="rounded-3xl p-5"
+      style={{ background: 'var(--surface)', border: '1px solid var(--line)' }}
+    >
+      <div className="flex items-center gap-2">
+        <Input value={name} onChange={(event) => setName(event.target.value)} className="text-xs font-semibold" />
+        <Button variant="outline" size="sm" disabled={pending} onClick={() => onDelete(template.id)}>
+          <Trash2 size={13} />
+        </Button>
+      </div>
+      <Textarea
+        value={text}
+        onChange={(event) => setText(event.target.value)}
+        className="mt-2 min-h-20 text-xs"
+      />
+      {changed && (
+        <Button
+          size="sm"
+          className="mt-2"
+          disabled={pending}
+          onClick={() => onSave({ id: template.id, name, text })}
+        >
+          <Save size={13} /> Сохранить
+        </Button>
+      )}
+    </section>
+  )
+}
+
+function VariablesManager({
+  variables,
+  onChange,
+  pending,
+  run,
+}: {
+  variables: FlowVariable[]
+  onChange: (next: FlowVariable[]) => void
+  pending: boolean
+  run: (fn: () => void) => void
+}) {
+  const [draft, setDraft] = useState<{
+    name: string
+    source: FlowVariable['source']
+    value: string
+    aiPrompt: string
+  }>({ name: '', source: 'static', value: '', aiPrompt: '' })
+
+  function add() {
+    run(async () => {
+      const result = await saveFlowVariable({
+        name: draft.name,
+        source: draft.source,
+        value: draft.source === 'static' ? draft.value : null,
+        aiPrompt: draft.source === 'ai' ? draft.aiPrompt : null,
+      })
+      if (!result.success) {
+        toast.error(result.error)
+        return
+      }
+      toast.success(`Переменная {{${draft.name}}} создана`)
+      onChange([
+        ...variables,
+        {
+          id: result.id as string,
+          name: draft.name,
+          source: draft.source,
+          value: draft.source === 'static' ? draft.value : null,
+          aiPrompt: draft.source === 'ai' ? draft.aiPrompt : null,
+        },
+      ])
+      setDraft({ name: '', source: 'static', value: '', aiPrompt: '' })
+    })
+  }
+
+  function drop(id: string) {
+    run(async () => {
+      const result = await deleteFlowVariable(id)
+      if (!result.success) {
+        toast.error(result.error)
+        return
+      }
+      toast.success('Переменная удалена')
+      onChange(variables.filter((item) => item.id !== id))
+    })
+  }
+
+  return (
+    <main className="mx-auto w-full max-w-3xl flex-1 space-y-4 overflow-y-auto p-4 md:p-8">
+      <p className="text-xs leading-relaxed" style={{ color: 'var(--ink-3)' }}>
+        Подстановки для текстов и шаблонов. Пишете в тексте <code>{'{{имя}}'}</code> — бот подставляет значение
+        в момент отправки. ИИ-переменную модель заполняет сама по вашему промпту.
+      </p>
+
+      {variables.map((variable) => {
+        const meta = VARIABLE_SOURCES.find(([id]) => id === variable.source)
+        return (
+          <section
+            key={variable.id}
+            className="flex items-start justify-between gap-3 rounded-2xl p-4"
+            style={{ background: 'var(--surface)', border: '1px solid var(--line)' }}
+          >
+            <div className="min-w-0">
+              <code className="text-[13px] font-bold" style={{ color: 'var(--brand-ink)' }}>
+                {`{{${variable.name}}}`}
+              </code>
+              <p className="mt-0.5 text-[11px]" style={{ color: 'var(--ink-3)' }}>
+                {meta?.[1] ?? variable.source}
+                {variable.source === 'static' && variable.value ? ` · «${variable.value}»` : ''}
+              </p>
+              {variable.source === 'ai' && variable.aiPrompt && (
+                <p className="mt-1 text-[11px] italic" style={{ color: 'var(--ink-3)' }}>
+                  {variable.aiPrompt}
+                </p>
+              )}
+            </div>
+            <Button variant="outline" size="sm" disabled={pending} onClick={() => drop(variable.id)}>
+              <Trash2 size={13} />
+            </Button>
+          </section>
+        )
+      })}
+
+      <section
+        className="rounded-3xl p-5"
+        style={{ background: 'var(--surface)', border: '1px solid var(--line)' }}
+      >
+        <p className="text-sm font-bold" style={{ color: 'var(--ink)' }}>
+          Новая переменная
+        </p>
+        <div className="mt-3 space-y-2">
+          <div>
+            <Label className="text-xs">Имя (без фигурных скобок)</Label>
+            <Input
+              value={draft.name}
+              placeholder="город"
+              onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))}
+              className="mt-1 text-xs"
+            />
+          </div>
+          <div>
+            <Label className="text-xs">Что хранит</Label>
+            <select
+              value={draft.source}
+              onChange={(event) =>
+                setDraft((current) => ({ ...current, source: event.target.value as FlowVariable['source'] }))
+              }
+              className={selectClass}
+            >
+              {VARIABLE_SOURCES.map(([id, label, hint]) => (
+                <option key={id} value={id}>
+                  {label} — {hint}
+                </option>
+              ))}
+            </select>
+          </div>
+          {draft.source === 'static' && (
+            <div>
+              <Label className="text-xs">Значение</Label>
+              <Input
+                value={draft.value}
+                onChange={(event) => setDraft((current) => ({ ...current, value: event.target.value }))}
+                className="mt-1 text-xs"
+              />
+            </div>
+          )}
+          {draft.source === 'ai' && (
+            <div>
+              <Label className="text-xs">Промпт для модели</Label>
+              <Textarea
+                value={draft.aiPrompt}
+                placeholder="Определи город клиента по переписке. Если города нет — верни пустую строку."
+                onChange={(event) => setDraft((current) => ({ ...current, aiPrompt: event.target.value }))}
+                className="mt-1 min-h-20 text-xs"
+              />
+              <p className="mt-1 text-[11px]" style={{ color: 'var(--warn)' }}>
+                Такая переменная стоит вызова модели на каждое сообщение, где она встретилась.
+              </p>
+            </div>
+          )}
+          <Button size="sm" disabled={pending || !draft.name.trim()} onClick={add}>
+            <Plus size={14} /> Добавить переменную
+          </Button>
+        </div>
+      </section>
+    </main>
   )
 }

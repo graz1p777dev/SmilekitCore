@@ -6,7 +6,7 @@
 
 import { createAdminClient } from '@/lib/supabase/admin'
 import { log } from '../logger'
-import type { FlowAction, FlowCondition, FlowRule } from './types'
+import type { FlowAction, FlowCondition, FlowDedupe, FlowRule, FlowTemplate, FlowVariable } from './types'
 
 const TABLE = 'flow_rules'
 const CACHE_TTL_MS = 10_000
@@ -26,6 +26,7 @@ interface Row {
   conditions: FlowCondition[] | null
   actions: FlowAction[] | null
   stop_after: boolean
+  dedupe: FlowDedupe | null
   layout: Record<string, { x: number; y: number }> | null
 }
 
@@ -39,6 +40,7 @@ function toRule(row: Row): FlowRule {
     conditions: row.conditions ?? [],
     actions: row.actions ?? [],
     stopAfter: row.stop_after,
+    dedupe: row.dedupe ?? { mode: 'off' },
     layout: row.layout ?? {},
   }
 }
@@ -53,7 +55,7 @@ async function loadAll(): Promise<FlowRule[]> {
   try {
     const result = await createAdminClient()
       .from(TABLE)
-      .select('id, channel, name, enabled, position, conditions, actions, stop_after, layout')
+      .select('id, channel, name, enabled, position, conditions, actions, stop_after, dedupe, layout')
       .order('position')
     if (result.error) {
       log.warn(`сценарии недоступны: ${result.error.message}`)
@@ -96,6 +98,7 @@ export async function saveRule(input: SaveRuleInput): Promise<{ ok: true; id: st
     conditions: input.conditions,
     actions: input.actions,
     stop_after: input.stopAfter,
+    dedupe: input.dedupe,
     layout: input.layout,
     updated_at: new Date().toISOString(),
   }
@@ -211,4 +214,124 @@ export async function finishJob(
     .from(JOBS_TABLE)
     .update({ status, error: error ?? null, finished_at: new Date().toISOString() })
     .eq('id', id)
+}
+
+// ─── Шаблоны и переменные ────────────────────────────────────────────────
+//
+// Кэш общий с ветками по смыслу (10 секунд): подстановки читаются на каждое
+// сообщение, а правятся редко.
+
+const TEMPLATES_TABLE = 'flow_templates'
+const VARIABLES_TABLE = 'flow_variables'
+
+let templatesCache: { items: FlowTemplate[]; loadedAt: number } | null = null
+let variablesCache: { items: FlowVariable[]; loadedAt: number } | null = null
+
+export function invalidateAssets(): void {
+  templatesCache = null
+  variablesCache = null
+}
+
+export async function listTemplates(): Promise<FlowTemplate[]> {
+  if (templatesCache && Date.now() - templatesCache.loadedAt < CACHE_TTL_MS) return templatesCache.items
+  try {
+    const { data, error } = await createAdminClient()
+      .from(TEMPLATES_TABLE)
+      .select('id, name, text')
+      .order('name')
+    if (error) {
+      log.warn(`шаблоны недоступны: ${error.message}`)
+      return []
+    }
+    const items = (data ?? []) as FlowTemplate[]
+    templatesCache = { items, loadedAt: Date.now() }
+    return items
+  } catch {
+    return []
+  }
+}
+
+export async function saveTemplate(
+  input: { id?: string; name: string; text: string }
+): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  const { data, error } = await createAdminClient()
+    .from(TEMPLATES_TABLE)
+    .upsert({
+      ...(input.id ? { id: input.id } : {}),
+      name: input.name,
+      text: input.text,
+      updated_at: new Date().toISOString(),
+    })
+    .select('id')
+    .maybeSingle()
+  if (error) return { ok: false, error: error.message }
+  invalidateAssets()
+  return { ok: true, id: (data as { id: string }).id }
+}
+
+export async function removeTemplate(id: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { error } = await createAdminClient().from(TEMPLATES_TABLE).delete().eq('id', id)
+  if (error) return { ok: false, error: error.message }
+  invalidateAssets()
+  return { ok: true }
+}
+
+interface VariableRow {
+  id: string
+  name: string
+  source: FlowVariable['source']
+  ai_prompt: string | null
+  value: string | null
+}
+
+export async function listVariables(): Promise<FlowVariable[]> {
+  if (variablesCache && Date.now() - variablesCache.loadedAt < CACHE_TTL_MS) return variablesCache.items
+  try {
+    const { data, error } = await createAdminClient()
+      .from(VARIABLES_TABLE)
+      .select('id, name, source, ai_prompt, value')
+      .order('name')
+    if (error) {
+      log.warn(`переменные сценария недоступны: ${error.message}`)
+      return []
+    }
+    const items = ((data ?? []) as VariableRow[]).map((row) => ({
+      id: row.id,
+      name: row.name,
+      source: row.source,
+      aiPrompt: row.ai_prompt,
+      value: row.value,
+    }))
+    variablesCache = { items, loadedAt: Date.now() }
+    return items
+  } catch {
+    return []
+  }
+}
+
+export async function saveVariable(
+  input: { id?: string; name: string; source: FlowVariable['source']; aiPrompt?: string | null; value?: string | null }
+): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  const { data, error } = await createAdminClient()
+    .from(VARIABLES_TABLE)
+    .upsert({
+      ...(input.id ? { id: input.id } : {}),
+      name: input.name,
+      source: input.source,
+      ai_prompt: input.aiPrompt ?? null,
+      value: input.value ?? null,
+      updated_at: new Date().toISOString(),
+    })
+    .select('id')
+    .maybeSingle()
+  if (error) return { ok: false, error: error.message }
+  invalidateAssets()
+  return { ok: true, id: (data as { id: string }).id }
+}
+
+export async function removeVariable(id: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { error } = await createAdminClient().from(VARIABLES_TABLE).delete().eq('id', id)
+  if (error) return { ok: false, error: error.message }
+  invalidateAssets()
+  return { ok: true }
 }

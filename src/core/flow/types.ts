@@ -21,8 +21,10 @@ export interface FlowCondition {
 }
 
 export type FlowAction =
-  /** Ответить текстом. Поддерживает {{name}}, {{phone}}, {{text}}. */
+  /** Ответить текстом. Поддерживает подстановки {{переменная}}. */
   | { type: 'reply'; text: string }
+  /** Ответить сохранённым шаблоном — текст правится в одном месте. */
+  | { type: 'template'; templateId: string }
   /** Отправить файл по ссылке: фото результата, QR, документ. */
   | { type: 'media'; url: string; fileName: string; caption?: string; voice?: boolean }
   /** Пауза. Дальнейшие действия выполнит планировщик. */
@@ -38,6 +40,19 @@ export type FlowAction =
 
 export type FlowActionType = FlowAction['type']
 
+/**
+ * Защита от дублей: сколько раз ветка вправе сработать в одном чате.
+ * off — без ограничений; once_per_chat — ровно один раз за всю переписку;
+ * cooldown — не чаще, чем раз в N минут.
+ */
+export type DedupeMode = 'off' | 'once_per_chat' | 'cooldown'
+
+export interface FlowDedupe {
+  mode: DedupeMode
+  /** Только для cooldown. */
+  minutes?: number
+}
+
 export interface FlowRule {
   id: string
   channel: string
@@ -49,8 +64,43 @@ export interface FlowRule {
   actions: FlowAction[]
   /** Не продолжать встроенный скрипт продаж после этой ветки. */
   stopAfter: boolean
+  dedupe: FlowDedupe
   /** Координаты узлов на канве — оформление, на выполнение не влияет. */
   layout: Record<string, { x: number; y: number }>
+}
+
+/** Именованный текст: ветки ссылаются на него, а не копируют формулировку. */
+export interface FlowTemplate {
+  id: string
+  name: string
+  text: string
+}
+
+/**
+ * Откуда переменная берёт значение.
+ *
+ * ai — единственный источник, который стоит денег и времени: модель
+ * заполняет переменную по своему промпту прямо во время ответа клиенту.
+ */
+export type VariableSource =
+  | 'date'
+  | 'time'
+  | 'datetime'
+  | 'client_name'
+  | 'client_phone'
+  | 'message'
+  | 'static'
+  | 'ai'
+
+export interface FlowVariable {
+  id: string
+  /** Имя подстановки: {{город}}. */
+  name: string
+  source: VariableSource
+  /** Что модель должна положить в переменную (source = 'ai'). */
+  aiPrompt: string | null
+  /** Фиксированное значение (source = 'static'). */
+  value: string | null
 }
 
 /**

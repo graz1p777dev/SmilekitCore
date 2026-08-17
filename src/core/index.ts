@@ -10,13 +10,27 @@ export { defineConfig, envList, listConfigs, requireEnv } from './config'
 export { vars, type VariableRow } from './variables'
 export { isEncryptionConfigured } from './crypto'
 export { runFlow, matchRule, executeActions, type FlowResult } from './flow/engine'
-export { activeRules, getRule, listRules, removeRule, saveRule, type SaveRuleInput } from './flow/store'
+export {
+  activeRules,
+  getRule,
+  listRules,
+  listTemplates,
+  listVariables,
+  removeRule,
+  saveRule,
+  type SaveRuleInput,
+} from './flow/store'
 export { startFlowScheduler } from './flow/jobs'
 export type {
   FlowAction,
   FlowActionType,
   FlowCondition,
   FlowRule,
+  FlowTemplate,
+  FlowVariable,
+  FlowDedupe,
+  DedupeMode,
+  VariableSource,
   ConditionField,
   ConditionOp,
 } from './flow/types'

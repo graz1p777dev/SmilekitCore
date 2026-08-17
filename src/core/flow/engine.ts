@@ -12,8 +12,8 @@ import { ai } from '../ai'
 import { crm } from '../crm'
 import { assertPublicHttpUrl, request } from '../http'
 import type { DialogContext } from '../types'
-import { activeRules, scheduleJob } from './store'
-import type { FlowAction, FlowCondition, FlowExecutionContext, FlowRule } from './types'
+import { activeRules, listTemplates, listVariables, scheduleJob } from './store'
+import type { FlowAction, FlowCondition, FlowExecutionContext, FlowRule, FlowVariable } from './types'
 
 // Ограничения на пользовательский ввод: regex пишет владелец, а не
 // программист, и на длинном тексте неудачное выражение способно надолго
@@ -70,13 +70,98 @@ export function matchRule(rule: FlowRule, input: MatchInput): boolean {
   return rule.conditions.every((condition) => matchCondition(condition, input))
 }
 
-/** Подстановки в текстах ответов. */
-function fill(template: string, ctx: FlowExecutionContext): string {
-  return template
-    .replaceAll('{{name}}', ctx.authorName ?? '')
-    .replaceAll('{{phone}}', ctx.chatId)
-    .replaceAll('{{text}}', ctx.text)
-    .trim()
+// Часовой пояс компании: даты и время в переменных должны совпадать с тем,
+// что менеджер видит на часах, а не с часовым поясом сервера.
+const TIME_ZONE = 'Asia/Bishkek'
+
+function formatNow(source: 'date' | 'time' | 'datetime'): string {
+  const now = new Date()
+  const date = new Intl.DateTimeFormat('ru-RU', { timeZone: TIME_ZONE, day: '2-digit', month: 'long' }).format(now)
+  const time = new Intl.DateTimeFormat('ru-RU', { timeZone: TIME_ZONE, hour: '2-digit', minute: '2-digit' }).format(now)
+  if (source === 'date') return date
+  if (source === 'time') return time
+  return `${date}, ${time}`
+}
+
+/**
+ * Значение переменной. Всё, кроме 'ai', считается локально и мгновенно;
+ * 'ai' — единственный источник, который реально ходит в модель.
+ */
+async function variableValue(variable: FlowVariable, ctx: FlowExecutionContext): Promise<string> {
+  switch (variable.source) {
+    case 'date':
+    case 'time':
+    case 'datetime':
+      return formatNow(variable.source)
+    case 'client_name':
+      return ctx.authorName ?? ''
+    case 'client_phone':
+      return ctx.chatId
+    case 'message':
+      return ctx.text
+    case 'static':
+      return variable.value ?? ''
+    case 'ai': {
+      if (!variable.aiPrompt?.trim()) return ''
+      try {
+        const answer = await ai.complete({
+          message: ctx.text,
+          system:
+            `${variable.aiPrompt}\n\n` +
+            'Ответь ТОЛЬКО значением, без пояснений и кавычек. ' +
+            'Если данных для ответа нет — верни пустую строку.',
+          history: ctx.history.map((item) => ({ role: item.role, content: item.content })),
+          maxTokens: 120,
+        })
+        return answer?.trim() ?? ''
+      } catch (error) {
+        // Переменная не заполнилась — это не повод не отвечать клиенту:
+        // подставляем пустую строку и пишем причину в лог.
+        ctx.log.error(`переменная {{${variable.name}}}: модель не ответила`, error)
+        return ''
+      }
+    }
+    default:
+      return ''
+  }
+}
+
+const PLACEHOLDER = /\{\{\s*([^}]+?)\s*\}\}/g
+
+/**
+ * Подстановки в тексте. Встроенные {{name}}, {{phone}}, {{text}} работают
+ * всегда; остальные имена ищутся среди переменных сценария.
+ *
+ * Значение каждой переменной вычисляется один раз за текст, даже если она
+ * встретилась несколько раз — иначе ИИ-переменная стоила бы вызова модели
+ * на каждое вхождение.
+ */
+async function fill(template: string, ctx: FlowExecutionContext): Promise<string> {
+  if (!template.includes('{{')) return template.trim()
+
+  const builtin: Record<string, string> = {
+    name: ctx.authorName ?? '',
+    phone: ctx.chatId,
+    text: ctx.text,
+  }
+
+  const names = [...template.matchAll(PLACEHOLDER)].map((match) => match[1])
+  if (!names.length) return template.trim()
+
+  const custom = names.some((name) => !(name in builtin)) ? await listVariables() : []
+  const resolved = new Map<string, string>()
+
+  for (const name of names) {
+    if (resolved.has(name)) continue
+    if (name in builtin) {
+      resolved.set(name, builtin[name])
+      continue
+    }
+    const variable = custom.find((item) => item.name === name)
+    resolved.set(name, variable ? await variableValue(variable, ctx) : '')
+  }
+
+  return template.replace(PLACEHOLDER, (_, name: string) => resolved.get(name.trim()) ?? '').trim()
 }
 
 /**
@@ -117,21 +202,36 @@ export async function executeActions(
 async function runAction(action: FlowAction, ctx: FlowExecutionContext): Promise<boolean> {
   switch (action.type) {
     case 'reply': {
-      const text = fill(action.text, ctx)
+      const text = await fill(action.text, ctx)
       if (!text) return true
       return ctx.chat.send({ text })
     }
 
-    case 'media':
+    case 'template': {
+      const template = (await listTemplates()).find((item) => item.id === action.templateId)
+      if (!template) {
+        // Шаблон удалили, а ветка на него ссылается. Молча пропустить —
+        // значит оставить клиента без ответа и не понять почему.
+        ctx.log.error(`шаблон ${action.templateId} не найден — шаг пропущен`)
+        return true
+      }
+      const text = await fill(template.text, ctx)
+      if (!text) return true
+      return ctx.chat.send({ text })
+    }
+
+    case 'media': {
+      const caption = action.caption ? await fill(action.caption, ctx) : undefined
       return ctx.chat.send({
         media: {
           url: action.url,
           fileName: action.fileName,
-          caption: action.caption ? fill(action.caption, ctx) : undefined,
+          caption,
           voice: action.voice,
         },
-        storeText: action.caption ? fill(action.caption, ctx) : '[файл]',
+        storeText: caption ?? '[файл]',
       })
+    }
 
     case 'ai_reply': {
       const answer = await ai
@@ -153,7 +253,7 @@ async function runAction(action: FlowAction, ctx: FlowExecutionContext): Promise
       return true
 
     case 'notify':
-      await crm.notifyTeam({ type: 'sale_lead', title: fill(action.title, ctx) })
+      await crm.notifyTeam({ type: 'sale_lead', title: await fill(action.title, ctx) })
       return true
 
     case 'webhook': {
@@ -174,6 +274,38 @@ async function runAction(action: FlowAction, ctx: FlowExecutionContext): Promise
     default:
       return true
   }
+}
+
+
+/**
+ * Ветке разрешено сработать в этом чате?
+ *
+ * Отметки хранятся в самой переписке (storeOnly-строки), а не в отдельной
+ * таблице: у них тот же жизненный цикл, что у диалога, и они автоматически
+ * видны при разборе истории чата.
+ */
+async function passesDedupe(rule: FlowRule, ctx: FlowExecutionContext): Promise<boolean> {
+  const mode = rule.dedupe?.mode ?? 'off'
+  if (mode === 'off') return true
+
+  const marker = `[ветка ${rule.id}]`
+
+  if (mode === 'once_per_chat') {
+    // claim атомарен: одновременные сообщения не проскочат оба.
+    return ctx.chat.claim(`rule:${rule.id}`, marker)
+  }
+
+  if (mode === 'cooldown') {
+    const minutes = Math.max(1, Math.round(rule.dedupe?.minutes ?? 60))
+    const lastFiredAt = await ctx.chat.sentAt(marker)
+    if (lastFiredAt && Date.now() - lastFiredAt.getTime() < minutes * 60_000) return false
+    // Отметка о срабатывании — с уникальным ключом, иначе вторая запись не
+    // пройдёт по UNIQUE и «пауза» превратилась бы в «один раз навсегда».
+    await ctx.chat.send({ key: `rule:${rule.id}:${Date.now()}`, storeOnly: true, storeText: marker })
+    return true
+  }
+
+  return true
 }
 
 export interface FlowResult {
@@ -199,8 +331,7 @@ export async function runFlow(ctx: DialogContext<unknown>): Promise<FlowResult> 
   const rule = rules.find((candidate) => matchRule(candidate, input))
   if (!rule) return { handled: false, stop: false }
 
-  ctx.log.info(`сценарий: сработала ветка «${rule.name}»`)
-  await executeActions(rule, 0, {
+  const execution: FlowExecutionContext = {
     channel: ctx.chat.channel,
     chatId: ctx.chat.id,
     chat: ctx.chat,
@@ -210,7 +341,18 @@ export async function runFlow(ctx: DialogContext<unknown>): Promise<FlowResult> 
     deal: ctx.deal,
     log: ctx.log,
     dryRun: ctx.dryRun,
-  })
+  }
+
+  // Защита от дублей. Проверяется ПОСЛЕ совпадения условий: ветка, которую
+  // придержали, не должна отдавать ход следующей — иначе клиент получит
+  // ответ от «запасной» ветки вместо тишины, которую владелец и настраивал.
+  if (!(await passesDedupe(rule, execution))) {
+    ctx.log.info(`сценарий: ветка «${rule.name}» придержана защитой от дублей`)
+    return { handled: true, stop: rule.stopAfter }
+  }
+
+  ctx.log.info(`сценарий: сработала ветка «${rule.name}»`)
+  await executeActions(rule, 0, execution)
 
   return { handled: true, stop: rule.stopAfter }
 }

@@ -80,7 +80,7 @@ export const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    label: 'AI Бот',
+    label: 'Бот и сценарии',
     items: [
       {
         href: '/dashboard/bot-analytics',
@@ -102,7 +102,7 @@ export const NAV_GROUPS: NavGroup[] = [
       },
       {
         href: '/dashboard/whatsapp-settings',
-        label: 'WhatsApp: шаблоны и доставка',
+        label: 'Шаблоны WhatsApp',
         icon: SlidersHorizontal,
         roles: ['owner'],
       },
@@ -129,7 +129,7 @@ export const NAV_GROUPS: NavGroup[] = [
       },
       {
         href: '/dashboard/whatsapp-lab',
-        label: 'Лаборатория WhatsApp',
+        label: 'Песочница WhatsApp',
         icon: FlaskConical,
         roles: ['owner'],
       },

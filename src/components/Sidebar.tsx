@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils'
 import { ROLE_LABELS } from '@/lib/constants'
 import { getInitials } from '@/lib/formatters'
 import { NAV_GROUPS } from '@/config/nav'
-import { LogOut } from 'lucide-react'
+import { LogOut, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import type { UserRole } from '@/types'
 
 function isActiveLink(pathname: string, href: string, exact?: boolean): boolean {
@@ -20,15 +20,44 @@ interface SidebarProps {
   onClose?: () => void
 }
 
+const COLLAPSED_KEY = 'sidebar-collapsed'
+const WIDTH_OPEN = 248
+const WIDTH_COLLAPSED = 68
+
 export default function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
   const pathname = usePathname()
   const { user, signOut } = useAuth()
   const role = user?.role as UserRole | undefined
 
-  // Десктоп: свёрнут до иконок, раскрывается по наведению или фокусу с клавиатуры.
-  // Мобильный drawer всегда раскрыт целиком.
-  const [hovered, setHovered] = useState(false)
-  const expanded = mobileOpen || hovered
+  // Панель раскрыта постоянно и сворачивается ТОЛЬКО по кнопке.
+  // Прежняя версия раскрывалась по наведению и толкала страницу — курсор
+  // приезжал к пункту, а контент под ним уезжал. Инструмент, в котором
+  // сидят весь день, не должен шевелиться сам по себе.
+  const [collapsed, setCollapsed] = useState(false)
+  // Анимацию ширины включаем только после того, как прочитали сохранённое
+  // состояние: иначе при загрузке панель заметно «схлопывается» на глазах.
+  const [ready, setReady] = useState(false)
+
+  useEffect(() => {
+    // Читаем после монтирования, а не в useState: на сервере localStorage
+    // нет, и разошедшаяся разметка дала бы ошибку гидратации.
+    const saved = localStorage.getItem(COLLAPSED_KEY) === '1'
+    requestAnimationFrame(() => {
+      setCollapsed(saved)
+      setReady(true)
+    })
+  }, [])
+
+  const toggleCollapsed = () => {
+    setCollapsed((value) => {
+      const next = !value
+      localStorage.setItem(COLLAPSED_KEY, next ? '1' : '0')
+      return next
+    })
+  }
+
+  // На мобильном drawer всегда показывает подписи целиком.
+  const showLabels = mobileOpen || !collapsed
 
   // Скользящая подсветка активного пункта
   const itemRefs = useRef<Map<string, HTMLAnchorElement | null>>(new Map())
@@ -59,7 +88,7 @@ export default function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
       setIndicator(prev => ({ ...prev, visible: false }))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeHref, role])
+  }, [activeHref, role, collapsed])
 
   // На мобильном: закрывать drawer при переходе на другую страницу
   useEffect(() => {
@@ -67,31 +96,26 @@ export default function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname])
 
+  const width = collapsed ? WIDTH_COLLAPSED : WIDTH_OPEN
+
   return (
     <>
-      {/* Панель fixed, поэтому отдельная колонка синхронно резервирует её ширину
-          и сдвигает страницу при раскрытии на десктопе. */}
+      {/* Панель fixed, поэтому отдельная колонка резервирует её ширину. */}
       <div
         aria-hidden
-        className={cn(
-          'hidden flex-shrink-0 transition-[width] duration-200 ease-out md:block',
-          hovered ? 'w-48' : 'w-16',
-        )}
+        className={cn('hidden flex-shrink-0 md:block', ready && 'transition-[width] duration-200 ease-out')}
+        style={{ width }}
       />
 
       <aside
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
-        onFocusCapture={() => setHovered(true)}
-        onBlurCapture={() => setHovered(false)}
         className={cn(
           'flex flex-col h-screen overflow-hidden',
-          'fixed inset-y-0 left-0 z-50 transition-all duration-200 ease-out',
-          'w-48 md:translate-x-0',
-          hovered ? 'md:w-48 md:shadow-2xl' : 'md:w-16',
+          'fixed inset-y-0 left-0 z-50 md:translate-x-0',
+          ready && 'transition-transform duration-200 ease-out md:transition-[width]',
           mobileOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full',
         )}
         style={{
+          width: mobileOpen ? WIDTH_OPEN : width,
           background: 'linear-gradient(180deg, rgba(30,21,54,0.92) 0%, rgba(14,10,26,0.95) 100%)',
           backdropFilter: 'blur(18px)',
           WebkitBackdropFilter: 'blur(18px)',
@@ -99,202 +123,193 @@ export default function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
           boxShadow: '8px 0 40px -18px rgba(124, 58, 237, 0.35)',
         }}
       >
-      {/* Логотип */}
-      <div
-        className="flex items-center gap-3 px-4 py-4 flex-shrink-0"
-        style={{ borderBottom: '1px solid var(--line)' }}
-      >
+        {/* Свечение вверху панели — тот же приём, что на витрине: источник
+            света у логотипа, а не равномерная заливка. */}
         <div
-          className="brand-mark flex-shrink-0"
-          style={{ width: 32, height: 32 }}
           aria-hidden
+          className="pointer-events-none absolute -top-16 left-1/2 -translate-x-1/2"
+          style={{
+            width: 200,
+            height: 140,
+            background: 'radial-gradient(circle, rgba(124,58,237,0.30), transparent 70%)',
+            filter: 'blur(24px)',
+          }}
         />
+
+        {/* Логотип */}
         <div
           className={cn(
-            'min-w-0 transition-opacity duration-200',
-            expanded ? 'opacity-100' : 'opacity-0',
+            'relative flex flex-shrink-0 items-center gap-2.5 py-4',
+            collapsed && !mobileOpen ? 'justify-center px-0' : 'px-4',
           )}
+          style={{ borderBottom: '1px solid var(--line)' }}
         >
-          <p className="brand-wordmark text-white truncate whitespace-nowrap" style={{ fontSize: 14 }}>
-            smilekit
-          </p>
-          <p style={{ fontSize: 11, color: 'var(--ink-3)' }} className="truncate whitespace-nowrap">
-            CRM система
-          </p>
-        </div>
-      </div>
-
-      {/* Навигация */}
-      <nav className="flex-1 overflow-y-auto px-2 py-3" style={{ scrollbarWidth: 'none' }}>
-        <div className="relative">
-          {/* Скользящая подсветка */}
-          <div
-            aria-hidden
-            style={{
-              position: 'absolute',
-              left: 0,
-              right: 0,
-              top: indicator.top,
-              height: indicator.height,
-              background: 'linear-gradient(135deg, var(--accent-from), var(--accent-deep))',
-              borderRadius: 10,
-              boxShadow: '0 6px 22px -6px var(--accent-shadow), inset 0 0 0 1px rgba(255,255,255,0.14)',
-              opacity: indicator.visible ? 1 : 0,
-              transition: animate
-                ? 'top 260ms cubic-bezier(0.22,1,0.36,1), height 260ms cubic-bezier(0.22,1,0.36,1), opacity 150ms ease'
-                : 'opacity 150ms ease',
-              pointerEvents: 'none',
-              zIndex: 0,
-            }}
-          />
-          {NAV_GROUPS.map((group) => {
-            const visible = group.items.filter(
-              (item) => role && item.roles.includes(role)
-            )
-            if (!visible.length) return null
-
-            return (
-              <div key={group.label} className="mb-5">
-                <p
-                  className={cn(
-                    'px-2 mb-1 uppercase tracking-widest font-semibold truncate whitespace-nowrap',
-                    'transition-opacity duration-200',
-                    expanded ? 'opacity-100' : 'opacity-0',
-                  )}
-                  style={{ fontSize: 10, color: 'var(--ink-4)' }}
-                >
-                  {group.label}
+          <div className="brand-mark flex-shrink-0" style={{ width: 32, height: 32 }} aria-hidden />
+          {showLabels && (
+            <>
+              <div className="min-w-0 flex-1">
+                <p className="brand-wordmark truncate whitespace-nowrap text-white" style={{ fontSize: 14 }}>
+                  smilekit
                 </p>
-                <ul className="space-y-0.5">
-                  {visible.map((item) => {
-                    const active = isActiveLink(pathname, item.href, item.exact)
-                    const Icon = item.icon
-                    const LinkTag = Link
+                <p style={{ fontSize: 11, color: 'var(--ink-3)' }} className="truncate whitespace-nowrap">
+                  CRM система
+                </p>
+              </div>
+              <button
+                onClick={toggleCollapsed}
+                title="Свернуть меню"
+                className="hidden shrink-0 rounded-lg p-1.5 transition-colors hover:bg-white/[0.08] md:block"
+                style={{ color: 'var(--ink-3)' }}
+              >
+                <PanelLeftClose size={16} />
+              </button>
+            </>
+          )}
+        </div>
 
-                    return (
-                      <li key={item.href}>
-                        <LinkTag
-                          ref={(el) => { itemRefs.current.set(item.href, el) }}
-                          href={item.href}
-                          // По умолчанию Next.js префетчит данные КАЖДОЙ ссылки
-                          // в сайдбаре (12+ пунктов), едва они попадают в
-                          // вьюпорт — на каждую навигацию это залповая нагрузка
-                          // на сервер, под которой другие запросы (например
-                          // server actions вроде переключателя бота) могут
-                          // зависать без ответа и без ошибки, блокируя UI
-                          // до перезагрузки страницы (см. AmoBotToggle).
-                          prefetch={false}
-                          title={expanded ? undefined : item.label}
-                          className={cn(
-                            'relative flex items-center gap-2.5 px-2.5 py-2 rounded-md transition-colors duration-150 outline-none',
-                            active
-                              ? 'text-white font-medium'
-                              : 'text-[var(--ink-2)] hover:bg-white/[0.06] hover:text-white focus-visible:bg-white/[0.06] focus-visible:text-white'
-                          )}
-                          style={{ zIndex: 1 }}
-                        >
-                          <span
-                            className="relative flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-lg"
-                            style={{
-                              background: active ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.06)',
-                              boxShadow: 'none',
-                            }}
-                            aria-hidden
+        {/* Кнопка раскрытия в свёрнутом состоянии — отдельной строкой,
+            чтобы не тесниться рядом с логотипом. */}
+        {collapsed && !mobileOpen && (
+          <button
+            onClick={toggleCollapsed}
+            title="Развернуть меню"
+            className="mx-auto mt-2 hidden rounded-lg p-1.5 transition-colors hover:bg-white/[0.08] md:block"
+            style={{ color: 'var(--ink-3)' }}
+          >
+            <PanelLeftOpen size={16} />
+          </button>
+        )}
+
+        {/* Навигация */}
+        <nav className="flex-1 overflow-y-auto px-2 py-3" style={{ scrollbarWidth: 'none' }}>
+          <div className="relative">
+            {/* Скользящая подсветка активного пункта */}
+            <div
+              aria-hidden
+              style={{
+                position: 'absolute',
+                left: 0,
+                right: 0,
+                top: indicator.top,
+                height: indicator.height,
+                background: 'linear-gradient(135deg, var(--accent-from), var(--accent-deep))',
+                borderRadius: 10,
+                boxShadow: '0 6px 22px -6px var(--accent-shadow), inset 0 0 0 1px rgba(255,255,255,0.14)',
+                opacity: indicator.visible ? 1 : 0,
+                transition: animate
+                  ? 'top 260ms cubic-bezier(0.22,1,0.36,1), height 260ms cubic-bezier(0.22,1,0.36,1), opacity 150ms ease'
+                  : 'opacity 150ms ease',
+                pointerEvents: 'none',
+                zIndex: 0,
+              }}
+            />
+            {NAV_GROUPS.map((group) => {
+              const visible = group.items.filter((item) => role && item.roles.includes(role))
+              if (!visible.length) return null
+
+              return (
+                <div key={group.label} className="mb-5">
+                  {showLabels ? (
+                    <p
+                      className="mb-1 truncate whitespace-nowrap px-2 font-semibold uppercase tracking-widest"
+                      style={{ fontSize: 10, color: 'var(--ink-4)' }}
+                    >
+                      {group.label}
+                    </p>
+                  ) : (
+                    // В свёрнутом виде подпись группы не помещается — вместо
+                    // неё разделительная черта, чтобы блоки не слипались.
+                    <div className="mx-3 mb-2 h-px" style={{ background: 'var(--line)' }} aria-hidden />
+                  )}
+                  <ul className="space-y-0.5">
+                    {visible.map((item) => {
+                      const active = isActiveLink(pathname, item.href, item.exact)
+                      const Icon = item.icon
+
+                      return (
+                        <li key={item.href}>
+                          <Link
+                            ref={(el) => { itemRefs.current.set(item.href, el) }}
+                            href={item.href}
+                            // По умолчанию Next.js префетчит данные КАЖДОЙ ссылки
+                            // в сайдбаре (20+ пунктов), едва они попадают в
+                            // вьюпорт — на каждую навигацию это залповая нагрузка
+                            // на сервер, под которой другие запросы (например
+                            // server actions вроде переключателя бота) могут
+                            // зависать без ответа и без ошибки, блокируя UI
+                            // до перезагрузки страницы (см. AmoBotToggle).
+                            prefetch={false}
+                            title={showLabels ? undefined : item.label}
+                            className={cn(
+                              'relative flex items-center gap-2.5 rounded-[10px] px-2.5 py-2 outline-none transition-colors duration-150',
+                              collapsed && !mobileOpen && 'justify-center',
+                              active
+                                ? 'font-medium text-white'
+                                : 'text-[var(--ink-2)] hover:bg-white/[0.06] hover:text-white focus-visible:bg-white/[0.06] focus-visible:text-white',
+                            )}
+                            style={{ zIndex: 1 }}
                           >
-                            <span
-                              aria-hidden
-                              style={{
-                                position: 'absolute',
-                                right: -8,
-                                top: -10,
-                                width: 18,
-                                height: 18,
-                                borderRadius: 999,
-                                backgroundColor: 'transparent',
-                              }}
-                            />
                             <Icon
                               style={{
-                                position: 'relative',
-                                width: 14,
-                                height: 14,
-                                color: active ? '#ffffff' : 'var(--ink-3)',
+                                width: 17,
+                                height: 17,
                                 flexShrink: 0,
+                                color: active ? '#ffffff' : 'var(--ink-3)',
                               }}
                             />
-                          </span>
-                          <span
-                            className={cn(
-                              'truncate whitespace-nowrap transition-opacity duration-200',
-                              expanded ? 'opacity-100' : 'opacity-0',
+                            {showLabels && (
+                              <span
+                                className="truncate whitespace-nowrap"
+                                style={{ fontSize: 13, fontWeight: active ? 500 : 400 }}
+                              >
+                                {item.label}
+                              </span>
                             )}
-                            style={{ fontSize: 13, fontWeight: active ? 500 : 400 }}
-                          >
-                            {item.label}
-                          </span>
-                        </LinkTag>
-                      </li>
-                    )
-                  })}
-                </ul>
-              </div>
-            )
-          })}
-        </div>
-      </nav>
-
-      {/* Пользователь */}
-      <div
-        className="flex-shrink-0 px-3 py-3"
-        style={{ borderTop: '1px solid var(--line)' }}
-      >
-        <div className="flex items-center gap-2.5">
-          {/* Аватар */}
-          <div
-            className="flex items-center justify-center rounded-full flex-shrink-0 text-white font-semibold brand-gradient"
-            style={{
-              width: 30, height: 30,
-              fontSize: 11,
-            }}
-          >
-            {user?.name ? getInitials(user.name) : '??'}
+                          </Link>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </div>
+              )
+            })}
           </div>
+        </nav>
 
-          {/* Имя и роль */}
-          <div
-            className={cn(
-              'flex-1 min-w-0 transition-opacity duration-200',
-              expanded ? 'opacity-100' : 'opacity-0',
+        {/* Пользователь */}
+        <div className="flex-shrink-0 px-3 py-3" style={{ borderTop: '1px solid var(--line)' }}>
+          <div className={cn('flex items-center gap-2.5', collapsed && !mobileOpen && 'justify-center')}>
+            <div
+              className="brand-gradient flex flex-shrink-0 items-center justify-center rounded-full font-semibold text-white"
+              style={{ width: 30, height: 30, fontSize: 11 }}
+              title={showLabels ? undefined : (user?.name ?? '')}
+            >
+              {user?.name ? getInitials(user.name) : '??'}
+            </div>
+
+            {showLabels && (
+              <>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate whitespace-nowrap font-medium text-white" style={{ fontSize: 12 }}>
+                    {user?.name ?? 'Загрузка...'}
+                  </p>
+                  <p style={{ fontSize: 11, color: 'var(--ink-3)' }} className="truncate whitespace-nowrap">
+                    {role ? ROLE_LABELS[role] : ''}
+                  </p>
+                </div>
+
+                <button
+                  onClick={() => signOut()}
+                  className="flex-shrink-0 rounded-lg p-1.5 transition-colors hover:bg-white/[0.08]"
+                  style={{ color: 'var(--ink-3)' }}
+                  title="Выйти"
+                >
+                  <LogOut style={{ width: 15, height: 15 }} />
+                </button>
+              </>
             )}
-          >
-            <p className="text-white font-medium truncate whitespace-nowrap" style={{ fontSize: 12 }}>
-              {user?.name ?? 'Загрузка...'}
-            </p>
-            <p style={{ fontSize: 11, color: 'var(--ink-3)' }} className="truncate whitespace-nowrap">
-              {role ? ROLE_LABELS[role] : ''}
-            </p>
           </div>
-
-          {/* Выход */}
-          <button
-            onClick={() => signOut()}
-            className={cn(
-              'flex-shrink-0 transition-all duration-200',
-              expanded ? 'opacity-100' : 'opacity-0 pointer-events-none',
-            )}
-            style={{ color: 'var(--ink-2)' }}
-            title="Выйти"
-            onMouseEnter={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.color = '#ffffff'
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.color = 'var(--ink-2)'
-            }}
-          >
-            <LogOut style={{ width: 15, height: 15 }} />
-          </button>
         </div>
-      </div>
       </aside>
     </>
   )
